@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>미적분은 왜 '극한'부터 시작할까? · 말투 수정본</title>
+<style>
+  :root{
+    --bg:#0f1421;
+    --bg2:#161d2e;
+    --fg:#e8ecf5;
+    --dim:#8b96ad;
+    --line:#2a3448;
+    --accent:#ffc857;      /* 강조 — 노랑 */
+    --accent2:#5ec8f2;     /* 보조 — 하늘 */
+    --danger:#ff6b6b;      /* 막힘 · 반칙 */
+    --ok:#7ee081;          /* 도달 */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--fg);
+    font-family:"Pretendard","맑은 고딕","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- 슬라이드 무대 ---------- */
+  #deck{position:fixed;inset:0}
+  .slide{
+    position:absolute;inset:0;
+    display:none;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    padding:5vh 7vw 9vh;
+    text-align:center;
+    opacity:0;
+    transition:opacity .25s ease;
+  }
+  .slide.on{display:flex;opacity:1}
+
+  /* ---------- 타이포 ---------- */
+  h1{font-size:clamp(34px,5.6vw,80px);line-height:1.18;letter-spacing:-.02em;font-weight:800}
+  h2{font-size:clamp(26px,3.8vw,54px);line-height:1.25;letter-spacing:-.015em;font-weight:800;margin-bottom:.5em}
+  h3{font-size:clamp(20px,2.4vw,34px);line-height:1.35;font-weight:700;color:var(--accent2)}
+  p{font-size:clamp(17px,2.05vw,30px);line-height:1.6;color:#cdd5e4}
+  .lead{font-size:clamp(20px,2.6vw,38px);line-height:1.55}
+  .small{font-size:clamp(16px,1.62vw,23px);color:var(--dim);line-height:1.55}
+  .huge{font-size:clamp(60px,14vw,190px);font-weight:800;letter-spacing:-.03em;line-height:1}
+  b,strong{color:var(--accent);font-weight:800}
+  em{font-style:normal;color:var(--accent2);font-weight:700}
+  .stack>*+*{margin-top:.9em}
+  .stack-lg>*+*{margin-top:1.5em}
+  .quote{
+    font-size:clamp(19px,2.3vw,34px);line-height:1.6;
+    border-left:4px solid var(--accent);padding-left:.9em;text-align:left;
+    max-width:22em;color:#dfe6f2;
+  }
+  .kicker{
+    font-size:clamp(15px,1.42vw,20px);letter-spacing:.2em;color:var(--dim);
+    text-transform:none;margin-bottom:1.1em;font-weight:700;
+  }
+
+  /* ---------- 카드 · 배치 ---------- */
+  .row{display:flex;gap:clamp(16px,2.6vw,44px);align-items:stretch;justify-content:center;flex-wrap:wrap;width:100%}
+  .card{
+    background:var(--bg2);border:1px solid var(--line);border-radius:16px;
+    padding:clamp(18px,2.4vw,36px);text-align:left;flex:1 1 0;min-width:260px;max-width:30em;
+  }
+  .card h3{margin-bottom:.45em}
+  .card p{font-size:clamp(17px,1.75vw,26px)}
+  .card.hot{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .tag{
+    display:inline-block;font-size:clamp(14px,1.32vw,19px);font-weight:800;
+    padding:.28em .8em;border-radius:999px;margin-bottom:.7em;letter-spacing:.02em;
+  }
+  .tag.a{background:rgba(94,200,242,.15);color:var(--accent2)}
+  .tag.b{background:rgba(255,200,87,.15);color:var(--accent)}
+  .tag.c{background:rgba(255,107,107,.15);color:var(--danger)}
+
+  /* ---------- 핵심 장면 시각화 ---------- */
+  .scene-box{
+    position:relative;width:100%;overflow:hidden;border-radius:14px;
+    border:1px solid rgba(139,150,173,.22);
+    background:linear-gradient(145deg,rgba(94,200,242,.055),rgba(15,20,33,.34));
+  }
+  .scene-box svg{display:block;width:100%;height:100%}
+
+  /* 1막: 구간단속과 고정식 카메라 */
+  .camera-card{display:flex;flex-direction:column}
+  .camera-scene{height:clamp(116px,15vh,170px);margin-bottom:clamp(14px,1.5vw,22px)}
+  .camera-scene .road{fill:#20293a}
+  .camera-scene .lane{stroke:#59657a;stroke-width:3;stroke-dasharray:15 14}
+  .camera-scene .gantry{stroke:#92a0b8;stroke-width:5;stroke-linecap:round;fill:none}
+  .camera-scene .sensor{fill:var(--accent2)}
+  .camera-scene .car-body{fill:#dce4f2}
+  .camera-scene .car-window{fill:#617089}
+  .camera-scene .wheel{fill:#0a0e18;stroke:#92a0b8;stroke-width:2}
+  .camera-scene .measure-line{fill:none;stroke:var(--accent2);stroke-width:5;stroke-linecap:round}
+  .camera-scene .measure-arrow{fill:var(--accent2)}
+  .camera-scene .point-line{stroke:var(--accent);stroke-width:6}
+  .camera-scene .pulse{fill:none;stroke:var(--accent);stroke-width:4;opacity:.85}
+  .camera-scene text{font-family:inherit;font-weight:800;fill:#cdd5e4}
+  .camera-card.step.shown .measure-line{
+    stroke-dasharray:390;stroke-dashoffset:390;animation:draw-measure .8s .15s ease forwards;
+  }
+  .camera-card.step.shown .pulse{transform-origin:330px 100px;animation:camera-pulse 1.15s .18s ease-out both}
+  @keyframes draw-measure{to{stroke-dashoffset:0}}
+  @keyframes camera-pulse{
+    0%{transform:scale(.35);opacity:0}
+    40%{opacity:1}
+    100%{transform:scale(1.35);opacity:.15}
+  }
+
+  /* 2막: 제논의 화살 */
+  .zeno-scene{
+    width:min(920px,91vw);height:clamp(190px,27vh,300px);
+    box-shadow:0 18px 55px rgba(0,0,0,.2);
+  }
+  .zeno-scene .frame{fill:#101725;stroke:#3a465c;stroke-width:3}
+  .zeno-scene .frame-corner{fill:none;stroke:#76839a;stroke-width:4;stroke-linecap:round}
+  .zeno-scene .flight-path{stroke:#4c5a70;stroke-width:3;stroke-dasharray:10 12}
+  .zeno-scene .arrow-shaft{stroke:var(--accent);stroke-width:12;stroke-linecap:round}
+  .zeno-scene .arrow-head{fill:var(--accent)}
+  .zeno-scene .arrow-tail{fill:none;stroke:var(--accent);stroke-width:7;stroke-linecap:round}
+  .zeno-scene .freeze-ring{fill:none;stroke:var(--accent2);stroke-width:3;opacity:.72}
+  .zeno-scene .shutter{stroke:var(--accent2);stroke-width:4;stroke-linecap:round;opacity:.82}
+  .zeno-scene text{font-family:inherit}
+  .slide.on .zeno-scene .shutter{animation:shutter-flash .7s .12s ease-out both}
+  .slide.on .zeno-scene .freeze-ring{transform-origin:500px 128px;animation:freeze-ring .75s .18s ease-out both}
+  @keyframes shutter-flash{
+    0%{opacity:0;stroke-dasharray:0 80}
+    45%{opacity:1}
+    100%{opacity:.72;stroke-dasharray:80 0}
+  }
+  @keyframes freeze-ring{
+    0%{transform:scale(.45);opacity:0}
+    55%{opacity:.9}
+    100%{transform:scale(1);opacity:.55}
+  }
+
+  /* 3막: 양쪽에서 10으로 다가가기 */
+  .limit-rail{
+    width:min(1000px,92vw);height:clamp(112px,15vh,150px);margin-top:.7em;
+    border:1px solid rgba(126,224,129,.35);border-radius:14px;
+    background:linear-gradient(90deg,rgba(94,200,242,.055),rgba(255,200,87,.07),rgba(94,200,242,.055));
+    overflow:hidden;
+  }
+  .limit-rail svg{display:block;width:100%;height:100%}
+  .limit-rail .axis{stroke:#4a576d;stroke-width:2}
+  .limit-rail .target{stroke:var(--accent);stroke-width:4}
+  .limit-rail .approach{fill:none;stroke:var(--accent2);stroke-width:5;stroke-linecap:round}
+  .limit-rail .dot{fill:var(--accent2);stroke:#0f1421;stroke-width:3}
+  .limit-rail .goal{fill:var(--accent);stroke:#0f1421;stroke-width:4}
+  .limit-rail .blocked-mark{fill:rgba(255,107,107,.12);stroke:var(--danger);stroke-width:2}
+  .limit-rail text{font-family:inherit;font-weight:800}
+  .limit-rail .value{fill:#b9c4d7;font-size:21px}
+  .limit-rail .goal-label{fill:var(--accent);font-size:30px}
+  .limit-rail .side-label{fill:var(--accent2);font-size:20px;letter-spacing:.05em}
+  .limit-rail .blocked-label{fill:var(--danger);font-size:18px}
+  .limit-rail.shown .approach{
+    stroke-dasharray:360;stroke-dashoffset:360;animation:converge-line .9s .12s ease forwards;
+  }
+  .limit-rail.shown .dot{animation:dot-in .38s ease both}
+  .limit-rail.shown .dot.d2{animation-delay:.16s}
+  .limit-rail.shown .dot.d3{animation-delay:.3s}
+  .limit-rail.shown .dot.d4{animation-delay:.44s}
+  .limit-rail.shown .goal{transform-origin:500px 74px;animation:goal-pop .48s .72s ease-out both}
+  @keyframes converge-line{to{stroke-dashoffset:0}}
+  @keyframes dot-in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+  @keyframes goal-pop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.2);opacity:1}100%{transform:scale(1)}}
+
+  /* 1막: 계기판의 짧은 측정 */
+  .dashboard-scene{width:min(940px,91vw);height:clamp(145px,20vh,215px)}
+  .dashboard-scene text{font-family:inherit;font-weight:800}
+  .dashboard-scene .wheel-ring{fill:#141c2a;stroke:#66758d;stroke-width:9}
+  .dashboard-scene .wheel-hub{fill:#0a0e18;stroke:var(--accent2);stroke-width:5}
+  .dashboard-scene .tick{stroke:var(--accent2);stroke-width:5;stroke-linecap:round}
+  .dashboard-scene .signal{fill:var(--accent2)}
+  .dashboard-scene .signal-line{fill:none;stroke:#5ec8f2;stroke-width:4;stroke-dasharray:9 10}
+  .dashboard-scene .gauge{fill:#101725;stroke:#3a465c;stroke-width:4}
+  .dashboard-scene .gauge-arc{fill:none;stroke:#67748a;stroke-width:12;stroke-linecap:round}
+  .dashboard-scene .gauge-live{fill:none;stroke:var(--accent);stroke-width:12;stroke-linecap:round}
+  .dashboard-scene .needle{stroke:var(--accent);stroke-width:7;stroke-linecap:round}
+  .dashboard-scene.step.shown .signal{animation:signal-pop .55s ease both}
+  .dashboard-scene.step.shown .signal.s2{animation-delay:.15s}
+  .dashboard-scene.step.shown .signal.s3{animation-delay:.3s}
+  .dashboard-scene.step.shown .needle{transform-origin:748px 126px;animation:needle-rise .8s .25s ease-out both}
+  @keyframes signal-pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes needle-rise{from{transform:rotate(-42deg)}to{transform:rotate(0)}}
+
+  /* 2막: 한 장과 두 장의 사진 */
+  .photo-card-visual{height:clamp(105px,14vh,150px);margin-bottom:clamp(14px,1.4vw,20px)}
+  .photo-card-visual .photo-frame{fill:#101725;stroke:#56637a;stroke-width:3}
+  .photo-card-visual .photo-arrow{stroke:var(--accent);stroke-width:8;stroke-linecap:round}
+  .photo-card-visual .photo-head{fill:var(--accent)}
+  .photo-card-visual .clock{fill:none;stroke:var(--accent2);stroke-width:3}
+  .photo-card-visual .time-span{fill:none;stroke:var(--accent2);stroke-width:4;stroke-linecap:round}
+  .photo-card-visual text{font-family:inherit;font-weight:800}
+  .card.step.shown .photo-card-visual .time-span{stroke-dasharray:180;stroke-dashoffset:180;animation:draw-measure .7s .12s ease forwards}
+
+  /* 3막: 낙하 장면 */
+  .concept-split{
+    display:grid;grid-template-columns:minmax(260px,.78fr) minmax(420px,1.22fr);
+    gap:clamp(28px,4vw,70px);align-items:center;width:min(1120px,100%);text-align:left;
+  }
+  .fall-scene{height:clamp(285px,45vh,430px);max-width:410px;justify-self:center}
+  .fall-scene .building{fill:#20293a;stroke:#3a465c;stroke-width:3}
+  .fall-scene .window{fill:#5ec8f2;opacity:.25}
+  .fall-scene .fall-path{fill:none;stroke:#5ec8f2;stroke-width:4;stroke-dasharray:10 11}
+  .fall-scene .ball-ghost{fill:#8b96ad;opacity:.48}
+  .fall-scene .ball-now{fill:var(--accent);stroke:#0f1421;stroke-width:4}
+  .fall-scene .time-mark{stroke:var(--accent);stroke-width:3}
+  .fall-scene text{font-family:inherit;font-weight:800}
+
+  /* 3막 보조: 원과 0.999… */
+  .arch-scene{height:clamp(108px,14vh,150px);margin-bottom:clamp(12px,1.3vw,18px)}
+  .arch-scene .circle-guide{fill:none;stroke:#59657a;stroke-width:3}
+  .arch-scene .poly{fill:rgba(94,200,242,.08);stroke:var(--accent2);stroke-width:3}
+  .arch-scene .number-line{stroke:#59657a;stroke-width:3}
+  .arch-scene .number-dot{fill:var(--accent2)}
+  .arch-scene .one-dot{fill:var(--accent)}
+  .arch-scene .to-one{stroke:var(--accent2);stroke-width:4;stroke-linecap:round}
+  .arch-scene text{font-family:inherit;font-weight:800}
+
+  /* 4막: 성공, 반칙, 역사, 토대 */
+  .success-scene{width:min(910px,90vw);height:clamp(135px,18vh,195px)}
+  .success-scene .orbit{fill:none;stroke:#5ec8f2;stroke-width:4}
+  .success-scene .sun{fill:var(--accent)}
+  .success-scene .planet{fill:var(--accent2)}
+  .success-scene .trajectory{fill:none;stroke:var(--accent);stroke-width:5;stroke-linecap:round}
+  .success-scene .ground{stroke:#59657a;stroke-width:4}
+  .success-scene .target-ring{fill:none;stroke:var(--danger);stroke-width:4}
+  .success-scene text{font-family:inherit;font-weight:800}
+  .slide.on .success-scene .trajectory{stroke-dasharray:520;stroke-dashoffset:520;animation:draw-measure 1s .15s ease forwards}
+
+  .h-conflict{
+    position:relative;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+    gap:clamp(18px,3vw,44px);width:min(900px,90vw);padding:clamp(18px,2vw,28px);
+    border-radius:16px;border:1px solid rgba(255,107,107,.45);background:rgba(255,107,107,.06);
+  }
+  .logic-term{font-size:clamp(28px,4vw,56px);font-weight:900;padding:.35em .55em;border-radius:12px}
+  .logic-term.blue{color:var(--accent2);background:rgba(94,200,242,.1)}
+  .logic-term.red{color:var(--danger);background:rgba(255,107,107,.1)}
+  .same-h{font-size:clamp(16px,1.7vw,23px);color:var(--dim);font-weight:800;white-space:nowrap}
+  .same-h::before,.same-h::after{content:"";display:inline-block;width:2.2em;height:2px;background:var(--dim);vertical-align:middle;margin:0 .55em}
+  .rule-stamp{
+    position:absolute;right:-.5em;top:-.7em;transform:rotate(8deg);
+    color:var(--danger);border:3px solid var(--danger);border-radius:8px;padding:.18em .45em;
+    font-size:clamp(18px,2.3vw,32px);font-weight:900;letter-spacing:.08em;background:var(--bg);
+  }
+
+  .history-timeline{width:min(930px,91vw);height:clamp(105px,14vh,145px)}
+  .history-timeline .timeline-line{stroke:#59657a;stroke-width:5;stroke-linecap:round}
+  .history-timeline .era{fill:var(--accent2);stroke:#0f1421;stroke-width:4}
+  .history-timeline .era.hot{fill:var(--accent)}
+  .history-timeline text{font-family:inherit;font-weight:800}
+
+  .foundation-scene{width:min(880px,88vw);height:clamp(150px,20vh,220px)}
+  .foundation-scene .pillar{fill:#263147;stroke:#56637a;stroke-width:3}
+  .foundation-scene .cap{fill:#344158}
+  .foundation-scene .base{fill:rgba(255,200,87,.16);stroke:var(--accent);stroke-width:4}
+  .foundation-scene text{font-family:inherit;font-weight:900}
+
+  /* 5막: 미분·적분·연속과 다리 */
+  .calculus-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(14px,2vw,28px);width:min(1200px,94vw)}
+  .concept-card{
+    background:var(--bg2);border:1px solid var(--line);border-radius:16px;
+    padding:clamp(16px,1.8vw,26px);text-align:left;
+  }
+  .concept-card h3{margin-bottom:.25em}
+  .concept-card p{font-size:clamp(17px,1.55vw,23px);line-height:1.48}
+  .concept-card svg{display:block;width:100%;height:clamp(95px,13vh,145px);margin-bottom:.55em}
+  .concept-card .grid-axis{stroke:#59657a;stroke-width:3}
+  .concept-card .curve{fill:none;stroke:var(--accent2);stroke-width:5;stroke-linecap:round}
+  .concept-card .helper{fill:none;stroke:#8b96ad;stroke-width:3;stroke-dasharray:7 7}
+  .concept-card .focus{fill:var(--accent)}
+  .concept-card .riemann{fill:rgba(94,200,242,.13);stroke:var(--accent2);stroke-width:2}
+
+  .bridge-scene{width:min(920px,90vw);height:clamp(150px,20vh,220px)}
+  .bridge-scene .water{stroke:#263750;stroke-width:5;stroke-linecap:round}
+  .bridge-scene .bridge-arc{fill:none;stroke:var(--accent);stroke-width:12;stroke-linecap:round}
+  .bridge-scene .deck-line{stroke:#dce4f2;stroke-width:7;stroke-linecap:round}
+  .bridge-scene .support{stroke:#56637a;stroke-width:6}
+  .bridge-scene .traveler{fill:var(--accent2)}
+  .bridge-scene text{font-family:inherit;font-weight:900}
+
+  /* ---------- 표 ---------- */
+  table{border-collapse:collapse;width:min(1000px,92vw);font-size:clamp(16px,1.78vw,27px)}
+  th,td{padding:.42em .6em;border-bottom:1px solid var(--line);text-align:center}
+  th{color:var(--dim);font-weight:700;font-size:.9em;letter-spacing:.04em}
+  td.v{font-variant-numeric:tabular-nums;font-weight:800;color:var(--fg)}
+  tr.blocked td{color:var(--danger);font-weight:800;background:rgba(255,107,107,.07)}
+  tr.blocked td.v{color:var(--danger)}
+  .rowfx{opacity:0;transform:translateY(6px);transition:opacity .28s ease,transform .28s ease}
+  .rowfx.shown{opacity:1;transform:none}
+  .conv{
+    margin-top:.9em;font-size:clamp(20px,2.8vw,44px);font-weight:800;color:var(--ok);
+  }
+  .lr{display:flex;gap:2em;justify-content:center;color:var(--dim);font-size:clamp(16px,1.48vw,21px);margin-top:.4em}
+
+  /* 미리보기 표 (5막) */
+  table.plain td{text-align:left;font-size:clamp(16px,1.72vw,26px);font-weight:400;color:#cdd5e4}
+  table.plain td:first-child{text-align:center;font-weight:800;color:var(--accent);white-space:nowrap;width:6.5em}
+
+  /* ---------- 단계 등장 ---------- */
+  .step{opacity:0;transform:translateY(8px);transition:opacity .3s ease,transform .3s ease}
+  .step.shown{opacity:1;transform:none}
+
+  /* ---------- 표지 ---------- */
+  .cover .bar{width:64px;height:5px;background:var(--accent);border-radius:3px;margin:0 auto 2em}
+
+  /* ---------- HUD ---------- */
+  #hud{
+    position:fixed;left:0;right:0;bottom:0;height:38px;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 18px;font-size:15px;color:var(--dim);
+    background:linear-gradient(to top,rgba(15,20,33,.95),transparent);
+    pointer-events:none;
+  }
+  #act{font-weight:800;letter-spacing:.1em}
+  #act span{color:var(--accent2)}
+  #bar{position:fixed;left:0;top:0;height:3px;background:var(--accent);width:0;transition:width .25s ease;z-index:5}
+
+  /* ---------- 발표자 노트 ---------- */
+  #notes{
+    position:fixed;right:0;top:0;bottom:0;width:min(430px,38vw);
+    background:#0a0e18;border-left:1px solid var(--line);
+    padding:26px 24px;overflow-y:auto;transform:translateX(100%);
+    transition:transform .22s ease;z-index:10;
+  }
+  #notes.on{transform:none}
+  #notes h4{color:var(--accent);font-size:15px;letter-spacing:.18em;margin-bottom:14px;font-weight:800}
+  #notes .body{font-size:17px;line-height:1.68;color:#c3cbdb;white-space:pre-wrap}
+  #notes .body b{color:var(--accent)}
+  #notes .body i{font-style:normal;color:var(--accent2)}
+
+  /* ---------- 도움말 ---------- */
+  #help{
+    position:fixed;inset:0;background:rgba(10,14,24,.94);z-index:20;
+    display:none;align-items:center;justify-content:center;
+  }
+  #help.on{display:flex}
+  #help div{font-size:19px;line-height:2;color:#c3cbdb}
+  #help kbd{
+    display:inline-block;min-width:2.2em;text-align:center;
+    background:var(--bg2);border:1px solid var(--line);border-radius:6px;
+    padding:.15em .55em;margin-right:.7em;color:var(--fg);font-weight:700;font-family:inherit;
+  }
+  @media (max-width:720px){
+    .camera-scene{height:110px}
+    .zeno-scene{height:180px}
+    .limit-rail{height:110px}
+    .limit-rail .value{font-size:18px}
+    .concept-split{grid-template-columns:1fr;text-align:center}
+    .fall-scene{display:none}
+    .calculus-grid{grid-template-columns:1fr}
+  }
+  @media (max-height:850px){
+    .visual-dense .stack-lg>*+*{margin-top:.65em}
+    .visual-dense .stack>*+*{margin-top:.5em}
+    .slide.limit-table-slide{padding-top:3vh;padding-bottom:6vh}
+    .limit-table-slide table{font-size:clamp(15px,1.45vw,21px)}
+    .limit-table-slide th,.limit-table-slide td{padding:.25em .5em}
+    .limit-table-slide .limit-rail{height:100px;margin-top:.35em}
+    .limit-table-slide .small{font-size:15px;line-height:1.3}
+    .limit-table-slide .stack>*+*{margin-top:.35em}
+    .dashboard-scene{height:125px}
+    .fall-scene{height:285px}
+    .arch-scene{height:96px}
+    .success-scene{height:120px}
+    .history-timeline{height:96px}
+    .foundation-scene{height:130px}
+    .concept-card{padding:13px}
+    .concept-card svg{height:78px}
+    .bridge-scene{height:125px}
+  }
+</style>
+<script type="text/javascript" nonce="9c4c69e09acc43aea5f42160dcc" src="//local.adguard.org?ts=1786164167249&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_00000000c51081fbb9775fd39e7293c4%26ts%3D496156%26p%3Dfs%26cid%3D1%26sig%3D4c57c302fb0048e1b16ef6e544c47fe2aa9f383412a3b25a9a3c37c1cf9c7822%26v%3D0&amp;app=chrome.exe&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1"></script></head>
+<body>
+
+<div id="bar"></div>
+<div id="deck">
+
+<!-- ═══════════ 표지 ═══════════ -->
+<section class="slide cover" data-act="도입" data-note="20분 구성. 수식은 3막 표의 숫자 외에는 쓰지 않는다.
+마지막에 lim 기호만 한 번 보여주고 '이것이 오늘 이야기의 이름표'라고 소개.
+
+<b>N</b> 키로 이 노트를 열고 닫는다. <b>?</b> 키로 단축키 확인.">
+  <div class="stack">
+    <div class="bar"></div>
+    <p class="kicker">미적분1 · Ⅰ. 함수의 극한과 연속</p>
+    <h1>미적분은 왜<br><em>'극한'</em>부터 시작할까?</h1>
+    <p class="small" style="margin-top:2em">사건 → 좌절 → 발상의 전환 → 해결 → 예고</p>
+  </div>
+</section>
+
+<!-- ═══════════ 1막 ═══════════ -->
+<section class="slide" data-act="1막 · 훅" data-note="<i>발문</i>
+&quot;고속도로의 단속 카메라는 크게 두 종류입니다.
+하나는 구간단속 — 20km 구간을 몇 분에 통과했는지 잽니다.
+하나는 고정식 — 그 지점을 지나는 바로 그 순간의 속도를 잽니다.
+두 방식의 차이를 살펴봅시다.&quot;
+
+20km를 11분에 통과 → 약 <b>109km/h</b>. 단속 걸립니다.">
+  <div class="stack-lg" style="width:100%">
+    <h2>단속 카메라는 두 종류</h2>
+    <div class="row">
+      <div class="card camera-card step">
+        <span class="tag a">구간단속</span>
+        <figure class="scene-box camera-scene" aria-label="두 지점 사이의 긴 구간을 재는 구간단속 그림">
+          <svg viewBox="0 0 640 180" role="img">
+            <rect class="road" x="0" y="52" width="640" height="96"/>
+            <line class="lane" x1="0" y1="100" x2="640" y2="100"/>
+            <path class="gantry" d="M88 156V50H124M552 156V50H516"/>
+            <rect class="sensor" x="111" y="45" width="24" height="16" rx="4"/>
+            <rect class="sensor" x="505" y="45" width="24" height="16" rx="4"/>
+            <path class="measure-line" d="M137 27H503"/>
+            <path class="measure-arrow" d="M137 27l14-9v18zM503 27l-14-9v18z"/>
+            <text x="320" y="20" text-anchor="middle" font-size="20">20 km</text>
+            <g transform="translate(286 83)">
+              <path class="car-body" d="M0 18L14 3h46l17 15 16 4v25H-8V25z"/>
+              <path class="car-window" d="M19 8h34l12 11H10z"/>
+              <circle class="wheel" cx="12" cy="48" r="11"/>
+              <circle class="wheel" cx="72" cy="48" r="11"/>
+            </g>
+          </svg>
+        </figure>
+        <h3>20km 구간을 11분에</h3>
+        <p style="margin-top:.5em">→ 약 109 km/h<br><span class="small">거리 ÷ 시간. 초등학교 때부터 하던 나눗셈.</span></p>
+      </div>
+      <div class="card camera-card step">
+        <span class="tag b">고정식 카메라</span>
+        <figure class="scene-box camera-scene" aria-label="도로의 한 지점을 포착하는 고정식 카메라 그림">
+          <svg viewBox="0 0 640 180" role="img">
+            <rect class="road" x="0" y="52" width="640" height="96"/>
+            <line class="lane" x1="0" y1="100" x2="640" y2="100"/>
+            <line class="point-line" x1="330" y1="52" x2="330" y2="148"/>
+            <circle class="pulse" cx="330" cy="100" r="37"/>
+            <path class="gantry" d="M330 48V21h63"/>
+            <g transform="translate(389 10)">
+              <rect x="0" y="0" width="58" height="30" rx="6" fill="#92a0b8"/>
+              <rect x="43" y="7" width="22" height="16" rx="4" fill="#5ec8f2"/>
+              <circle cx="16" cy="15" r="6" fill="#20293a"/>
+            </g>
+            <text x="330" y="174" text-anchor="middle" font-size="20" fill="#ffc857">한 점</text>
+            <g transform="translate(243 83)">
+              <path class="car-body" d="M0 18L14 3h46l17 15 16 4v25H-8V25z"/>
+              <path class="car-window" d="M19 8h34l12 11H10z"/>
+              <circle class="wheel" cx="12" cy="48" r="11"/>
+              <circle class="wheel" cx="72" cy="48" r="11"/>
+            </g>
+          </svg>
+        </figure>
+        <h3>그 지점을 지나는 <em>바로 그 순간</em></h3>
+        <p style="margin-top:.5em">→ ? km/h<br><span class="small">'한 점'에서의 속도.</span></p>
+      </div>
+    </div>
+    <p class="step"><b>평균속도</b> 와 <b>순간속도</b></p>
+  </div>
+</section>
+
+<section class="slide" data-act="1막 · 훅" data-note="&quot;속도는 거리 ÷ 시간입니다. 그런데 여기서 이상한 점이 생깁니다.
+'순간'이면 걸린 시간이 <b>0초</b>입니다. 0초 동안 움직인 거리도 <b>0m</b>입니다.
+그렇다면 순간속도는 <b>0 ÷ 0</b>에 이릅니다.&quot;
+
+여기서 멈추고 다음 장으로.">
+  <div class="stack-lg">
+    <h2>속도 = 거리 ÷ 시간</h2>
+    <div class="stack step">
+      <p class="lead">그런데 <b>'순간'</b>이면 걸린 시간이 <b>0초</b>.</p>
+      <p class="lead">0초 동안 움직인 거리도 <b>0m</b>.</p>
+    </div>
+    <p class="lead step" style="color:var(--danger)">그럼 순간속도는 …?</p>
+  </div>
+</section>
+
+<section class="slide" data-act="1막 · 훅"
+ data-note="<i>활동</i> 계산기를 꺼내게 한다. <b>1÷0</b> 과 <b>0÷0</b> 둘 다 직접 계산하게 할 것.
+&quot;결과는?&quot; → '정의되지 않음 / Error'
+
+오류 메시지를 <b>눈으로 보는 경험</b>이 말로 듣는 것보다 훨씬 강렬하다.">
+  <div class="stack-lg">
+    <p class="huge">0 ÷ 0<span style="color:var(--dim)"> = ?</span></p>
+    <p class="lead step">계산기 꺼내서 <b>1 ÷ 0</b> 을 계산해보자.</p>
+    <p class="lead step">이번엔 <b>0 ÷ 0</b> 을 계산해보자. <b>결과는?</b></p>
+  </div>
+</section>
+
+<section class="slide" data-act="1막 · 훅"
+ data-note="<i>예상 오개념</i> &quot;0÷0은 그냥 0 아니에요?&quot; — 거의 반드시 나온다.
+
+나눗셈의 정의로 되돌린다. □ ÷ ○ = a 는 ○ × a = □ 라는 뜻.
+· 1÷0: 0×a=1 인 a는 <b>하나도 없다</b>
+· 0÷0: 0×a=0 인 a는 <b>전부 다 된다</b>
+
+&quot;계산이 '안 되는' 게 아니라, 답을 <b>하나로 정할 수가 없는</b> 것입니다.&quot;
+이 구분이 뒤에 나올 '부정형'의 씨앗이다. 🔺 상위권 걸림 지점.">
+  <div class="stack-lg" style="width:100%">
+    <h2>왜 안 될까? — 나눗셈의 뜻으로</h2>
+    <p class="lead step">□ ÷ ○ = <em>a</em> 라는 건 &nbsp;○ × <em>a</em> = □ &nbsp;라는 뜻</p>
+    <div class="row" style="margin-top:.4em">
+      <div class="card step">
+        <span class="tag c">1 ÷ 0</span>
+        <p>0 × <em>a</em> = 1 인 <em>a</em> 는?</p>
+        <h3 style="margin-top:.5em;color:var(--danger)">하나도 없다</h3>
+      </div>
+      <div class="card step">
+        <span class="tag c">0 ÷ 0</span>
+        <p>0 × <em>a</em> = 0 인 <em>a</em> 는?</p>
+        <h3 style="margin-top:.5em;color:var(--danger)">전부 다 된다</h3>
+      </div>
+    </div>
+    <p class="lead step">계산이 <b>안 되는</b> 게 아니라 &mdash; 답을 <b>하나로 정할 수가 없다</b></p>
+  </div>
+</section>
+
+<section class="slide visual-dense" data-act="1막 · 훅"
+ data-note="<i>반전 — 1막의 결정타</i>
+&quot;그런데 자동차 계기판에는 지금의 속도가 분명히 표시됩니다.
+계산할 수 없다면 이 숫자는 어떻게 나온 것인가?&quot;
+
+<b>사실은 계기판도 순간속도를 못 잽니다.</b> 바퀴 회전수를 아주 짧은 시간 동안 세서
+그 구간의 평균속도를 보여줍니다. 고정식 카메라도 마찬가지입니다.
+바닥에 깔린 코일 두 개 사이를 지나는 데 걸린 시간을 잽니다.
+
+&quot;즉 <b>기계는 진짜 순간을 포기한 겁니다.</b> 아주 짧은 구간의 근삿값을 보여주는 방식입니다.
+그렇다면 수학도 순간을 포기해야 하는가?&quot;
+
+→ 3막의 '근삿값 vs 정확한 값' 논쟁과 그대로 연결된다.">
+  <div class="stack-lg">
+    <h2>그런데 계기판에는<br>속도가 표시된다</h2>
+    <p class="lead step">계산할 수 없다면 <b>이 숫자는 어떻게 나온 것인가?</b></p>
+    <figure class="scene-box dashboard-scene step" aria-label="바퀴 회전 신호를 짧은 시간 동안 세어 속도계에 표시하는 과정">
+      <svg viewBox="0 0 960 210" role="img">
+        <circle class="wheel-ring" cx="155" cy="108" r="64"/>
+        <circle class="wheel-hub" cx="155" cy="108" r="19"/>
+        <path class="tick" d="M155 30v20M155 166v20M77 108h20M213 108h20M100 53l14 14M196 149l14 14M210 53l-14 14M114 149l-14 14"/>
+        <path class="signal-line" d="M232 108C300 58 420 58 502 108"/>
+        <circle class="signal s1" cx="300" cy="76" r="8" fill="#5ec8f2"/>
+        <circle class="signal s2" cx="365" cy="68" r="8" fill="#5ec8f2"/>
+        <circle class="signal s3" cx="430" cy="78" r="8" fill="#5ec8f2"/>
+        <text x="365" y="132" text-anchor="middle" fill="#8b96ad" font-size="19">짧은 시간 동안 회전수를 센다</text>
+        <path class="gauge" d="M540 26h350a18 18 0 0 1 18 18v122a18 18 0 0 1-18 18H540a18 18 0 0 1-18-18V44a18 18 0 0 1 18-18z"/>
+        <path class="gauge-arc" d="M580 137A132 132 0 0 1 850 137"/>
+        <path class="gauge-live" d="M580 137A132 132 0 0 1 754 42"/>
+        <line class="needle" x1="748" y1="126" x2="797" y2="71"/>
+        <circle cx="748" cy="126" r="10" fill="#ffc857"/>
+        <text x="715" y="171" text-anchor="middle" fill="#ffc857" font-size="36">87</text>
+        <text x="779" y="171" fill="#8b96ad" font-size="18">km/h</text>
+      </svg>
+    </figure>
+    <p class="lead step" style="color:var(--accent2)">사실 계기판도 <b>순간속도를 못 잽니다.</b><br>
+      <span class="small">아주 짧은 시간 동안 바퀴가 몇 바퀴 돌았는지 세서 — 결국 <b>짧은 구간의 평균속도</b></span></p>
+    <p class="lead step">기계는 <b>진짜 순간</b> 대신 근삿값을 보여준다.</p>
+    <p class="lead step" style="color:var(--accent)">그렇다면 수학도 순간을 포기해야 하는가?</p>
+  </div>
+</section>
+
+<!-- ═══════════ 2막 ═══════════ -->
+<section class="slide" data-act="2막 · 좌절"
+ data-note="<i>제논의 역설</i> (기원전 5세기)
+&quot;날아가는 화살을 사진으로 딱 한 장 찍었습니다.
+그 사진 속 화살은 움직이는가, 멈춰 있는가?&quot;
+(→ 멈춰 있다)
+&quot;그렇다면 매 순간 멈춰 있는 화살은 어떻게 날아가는가?&quot;
+
+<i>나올 법한 반론</i> &quot;모션블러가 있으면 움직이는지 알 수 있습니다.&quot;
+→ &quot;맞습니다. 그런데 <b>블러가 생겼다는 건 셔터가 열려 있던 시간이 있었다는 뜻</b>입니다.
+그것은 한 '순간'이 아니라 짧은 '구간'을 찍은 것입니다. 결국 같은 딜레마입니다.&quot;">
+  <div class="stack-lg">
+    <p class="kicker">기원전 5세기 · 제논</p>
+    <h2>날아가는 화살을<br>사진으로 딱 한 장 찍었다</h2>
+    <figure class="scene-box zeno-scene" aria-label="한 장의 사진 속에서 정지해 있는 화살">
+      <svg viewBox="0 0 1000 270" role="img">
+        <rect class="frame" x="18" y="10" width="964" height="220" rx="18"/>
+        <line class="flight-path" x1="88" y1="128" x2="912" y2="128"/>
+        <path class="frame-corner" d="M58 69V42h35M907 42h35v27M58 171v27h35M907 198h35v-27"/>
+        <text x="74" y="94" fill="#8b96ad" font-size="20" font-weight="700">00:00:00.000</text>
+        <line class="arrow-shaft" x1="365" y1="128" x2="644" y2="128"/>
+        <path class="arrow-head" d="M694 128l-65-38v76z"/>
+        <path class="arrow-tail" d="M365 128l-47-37M365 128l-47 37M365 128h-57"/>
+        <circle class="freeze-ring" cx="500" cy="128" r="78"/>
+        <path class="shutter" d="M500 34v25M500 197v25M405 128h-25M620 128h-25"/>
+        <text x="500" y="258" text-anchor="middle" fill="#8b96ad" font-size="23" font-weight="700">한 장의 사진 · 시간 정보 없음</text>
+      </svg>
+    </figure>
+    <p class="lead step">사진 속 화살은 <b>움직이는가, 멈춰 있는가?</b></p>
+    <p class="lead step">그렇다면 매 순간 멈춰 있는 화살은 &mdash; <b>어떻게 날아가는가?</b></p>
+  </div>
+</section>
+
+<section class="slide" data-act="2막 · 좌절"
+ data-note="딜레마를 한 문장으로 못박는다. 이 장이 2막의 핵심.
+
+&quot;순간을 보려면 사진이 한 장이어야 하는데,
+속도를 재려면 두 장이 필요하다.&quot;
+
+&quot;이 딜레마를 인류는 <b>2000년 동안</b> 해결하지 못했습니다.
+아리스토텔레스가 반박을 시도했지만 끝내 마무리하지 못했고, 갈릴레이도 어려움을 겪었습니다.
+오늘 배울 내용이 바로 그 해답입니다.&quot;">
+  <div class="stack-lg" style="width:100%">
+    <div class="row">
+      <div class="card step">
+        <span class="tag a">사진 한 장</span>
+        <figure class="scene-box photo-card-visual" aria-label="한 위치의 화살만 담긴 사진 한 장">
+          <svg viewBox="0 0 400 150" role="img">
+            <rect class="photo-frame" x="92" y="18" width="216" height="108" rx="10"/>
+            <line class="photo-arrow" x1="145" y1="73" x2="250" y2="73" stroke="#ffc857"/>
+            <path class="photo-head" d="M279 73l-38-23v46z" fill="#ffc857"/>
+            <circle class="clock" cx="327" cy="47" r="19"/>
+            <path class="clock" d="M327 47V35M327 47l10 7"/>
+            <line x1="309" y1="29" x2="345" y2="65" stroke="#ff6b6b" stroke-width="4"/>
+            <text x="200" y="144" text-anchor="middle" fill="#8b96ad" font-size="18">시간 간격이 없다</text>
+          </svg>
+        </figure>
+        <p>시간이 없다 → <b>속도를 알 수 없다</b></p>
+      </div>
+      <div class="card step">
+        <span class="tag b">사진 두 장</span>
+        <figure class="scene-box photo-card-visual" aria-label="서로 다른 두 위치의 화살과 두 사진 사이 시간 간격">
+          <svg viewBox="0 0 400 150" role="img">
+            <rect class="photo-frame" x="25" y="18" width="150" height="92" rx="9"/>
+            <rect class="photo-frame" x="225" y="18" width="150" height="92" rx="9"/>
+            <line class="photo-arrow" x1="48" y1="65" x2="112" y2="65" stroke="#ffc857"/>
+            <path class="photo-head" d="M139 65l-34-20v40z" fill="#ffc857"/>
+            <line class="photo-arrow" x1="248" y1="65" x2="312" y2="65" stroke="#ffc857"/>
+            <path class="photo-head" d="M339 65l-34-20v40z" fill="#ffc857"/>
+            <path class="time-span" d="M96 128H304M96 119v18M304 119v18"/>
+            <text x="200" y="145" text-anchor="middle" fill="#5ec8f2" font-size="18">시간 간격 Δt</text>
+          </svg>
+        </figure>
+        <p>이동거리 ÷ 걸린 시간 → 속도를 알 수 있다<br>
+        <span class="small">그런데 이건 이미 '순간'이 아니라 <b>'구간'</b></span></p>
+      </div>
+    </div>
+    <h2 class="step" style="margin-top:.6em">순간을 보려면 <em>한 장</em>이어야 하는데<br>속도를 재려면 <em>두 장</em>이 필요하다</h2>
+    <p class="lead step">이 딜레마를 인류가 <b>2000년</b> 동안 못 풀었습니다</p>
+  </div>
+</section>
+
+<!-- ═══════════ 3막 ═══════════ -->
+<section class="slide" data-act="3막 · 발상의 전환"
+ data-note="<i>상황 제시</i>
+&quot;높은 건물 옥상에서 공을 떨어뜨립니다.
+<b>1초가 되는 그 순간</b>의 속도를 구해봅시다.
+정확히 잴 수 없으니 — <b>일단 1초 근처부터</b> 살펴봅시다.&quot;
+
+계산 편의상 g = 10 m/s² 로 둔다. (낙하거리 = 5t²)
+물리에서 9.8을 배운 학생이 있으므로 <b>반드시 화면에 명시</b>할 것.
+9.8로 하면 14.7 / 10.29 / 9.849… 로 나와서 '10으로 간다'가 죽는다.">
+  <div class="concept-split">
+    <figure class="scene-box fall-scene" aria-label="건물 옥상에서 떨어지는 공과 1초 지점">
+      <svg viewBox="0 0 380 440" role="img">
+        <path class="building" d="M28 58h150v354H28z"/>
+        <path d="M15 58h178" stroke="#8b96ad" stroke-width="8"/>
+        <rect class="window" x="55" y="93" width="34" height="40" rx="3"/>
+        <rect class="window" x="116" y="93" width="34" height="40" rx="3"/>
+        <rect class="window" x="55" y="165" width="34" height="40" rx="3"/>
+        <rect class="window" x="116" y="165" width="34" height="40" rx="3"/>
+        <rect class="window" x="55" y="237" width="34" height="40" rx="3"/>
+        <rect class="window" x="116" y="237" width="34" height="40" rx="3"/>
+        <rect class="window" x="55" y="309" width="34" height="40" rx="3"/>
+        <rect class="window" x="116" y="309" width="34" height="40" rx="3"/>
+        <path class="fall-path" d="M258 55C258 145 258 240 258 383"/>
+        <circle class="ball-ghost" cx="258" cy="58" r="13" fill="#8b96ad"/>
+        <circle class="ball-ghost" cx="258" cy="145" r="13" fill="#8b96ad"/>
+        <circle class="ball-ghost" cx="258" cy="245" r="13" fill="#8b96ad"/>
+        <circle class="ball-now" cx="258" cy="382" r="17" fill="#ffc857"/>
+        <line class="time-mark" x1="213" y1="382" x2="340" y2="382"/>
+        <text x="284" y="51" fill="#8b96ad" font-size="18">0초</text>
+        <text x="284" y="150" fill="#8b96ad" font-size="18">0.5초</text>
+        <text x="284" y="373" fill="#ffc857" font-size="22">1초</text>
+        <text x="276" y="423" fill="#ffc857" font-size="19">이 순간의 속도</text>
+      </svg>
+    </figure>
+    <div class="stack-lg">
+      <h2>공을 떨어뜨렸습니다</h2>
+      <p class="lead step"><b>1초가 되는 그 순간</b>의 속도를 구해봅시다.</p>
+      <p class="lead step">정확히 잴 수 없으니 &mdash; <b>일단 1초 근처부터</b> 살펴봅시다.</p>
+      <p class="small step" style="margin-top:1.6em">
+        ※ 계산이 편하도록 중력가속도를 <b>g = 10 m/s²</b> 로 둡니다.<br>
+        떨어진 거리 = 5 × (시간)² &nbsp;|&nbsp; 실제 9.8로 해도 결론은 똑같습니다.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="slide limit-table-slide" data-act="3막 · 발상의 전환 ★"
+ data-note="<i>이 수업의 심장. 절대 서두르지 말 것.</i>
+
+표를 <b>한 줄씩</b> 연다. 한 줄 열 때마다 다음 값을 <b>예측하게</b> 한 뒤 연다.
+&quot;9.95 다음은?&quot; &quot;10.05 다음은?&quot;
+
+순서: 왼쪽에서 접근(5 → 9.5 → 9.95 → 9.995) → 오른쪽에서 접근(15 → 10.5 → 10.05 → 10.005)
+→ <b>마지막에 가운데 막힌 칸</b>을 연다.
+
+&quot;가운데 칸은 여전히 <b>계산할 수 없습니다.</b> 0÷0은 끝까지 계산되지 않습니다.
+그런데 이 숫자들은 어디로 가고 있는가?&quot;
+(학생들: &quot;10&quot;)
+
+&quot;그렇습니다. <b>아무도 10을 계산하지 않았는데, 모두가 10이라는 것을 압니다.</b>&quot;
+
+🔺 상위권 걸림: 위에서 접근한 값과 아래에서 접근한 값이 <b>같은 곳</b>으로 간다는 점.
+다음 시간 좌극한·우극한의 복선이다. 여기서는 이름을 붙이지 말고 관찰만 시킬 것.">
+  <div class="stack">
+    <h3 style="margin-bottom:.6em">1초일 때의 속도를 향해</h3>
+    <table>
+      <thead><tr><th>잰 구간</th><th>걸린 시간</th><th>평균속도</th></tr></thead>
+      <tbody>
+        <tr class="rowfx" data-r="1"><td>0초 ~ 1초</td><td>1초</td><td class="v">5 m/s</td></tr>
+        <tr class="rowfx" data-r="2"><td>0.9초 ~ 1초</td><td>0.1초</td><td class="v">9.5 m/s</td></tr>
+        <tr class="rowfx" data-r="3"><td>0.99초 ~ 1초</td><td>0.01초</td><td class="v">9.95 m/s</td></tr>
+        <tr class="rowfx" data-r="4"><td>0.999초 ~ 1초</td><td>0.001초</td><td class="v">9.995 m/s</td></tr>
+        <tr class="rowfx blocked" data-r="9"><td><b>1초 ~ 1초</b></td><td><b>0초</b></td><td class="v">0 ÷ 0 &nbsp;계산 불가</td></tr>
+        <tr class="rowfx" data-r="8"><td>1초 ~ 1.001초</td><td>0.001초</td><td class="v">10.005 m/s</td></tr>
+        <tr class="rowfx" data-r="7"><td>1초 ~ 1.01초</td><td>0.01초</td><td class="v">10.05 m/s</td></tr>
+        <tr class="rowfx" data-r="6"><td>1초 ~ 1.1초</td><td>0.1초</td><td class="v">10.5 m/s</td></tr>
+        <tr class="rowfx" data-r="5"><td>1초 ~ 2초</td><td>1초</td><td class="v">15 m/s</td></tr>
+      </tbody>
+    </table>
+    <figure class="limit-rail rowfx" data-r="10" aria-label="왼쪽과 오른쪽의 평균속도 값이 모두 10으로 다가가는 그림">
+      <svg viewBox="0 0 1000 150" role="img">
+        <line class="axis" x1="72" y1="78" x2="928" y2="78"/>
+        <line class="approach" x1="88" y1="78" x2="470" y2="78"/>
+        <line class="approach" x1="912" y1="78" x2="530" y2="78"/>
+        <path fill="#5ec8f2" d="M478 78l-16-10v20zM522 78l16-10v20z"/>
+
+        <text class="side-label" x="88" y="24">왼쪽에서</text>
+        <text class="side-label" x="912" y="24" text-anchor="end">오른쪽에서</text>
+
+        <circle class="dot d1" cx="92" cy="78" r="8"/>
+        <circle class="dot d2" cx="230" cy="78" r="8"/>
+        <circle class="dot d3" cx="350" cy="78" r="8"/>
+        <circle class="dot d4" cx="438" cy="78" r="8"/>
+        <text class="value" x="92" y="58" text-anchor="middle">5</text>
+        <text class="value" x="230" y="58" text-anchor="middle">9.5</text>
+        <text class="value" x="350" y="58" text-anchor="middle">9.95</text>
+        <text class="value" x="438" y="58" text-anchor="middle">9.995</text>
+
+        <circle class="dot d1" cx="908" cy="78" r="8"/>
+        <circle class="dot d2" cx="770" cy="78" r="8"/>
+        <circle class="dot d3" cx="650" cy="78" r="8"/>
+        <circle class="dot d4" cx="562" cy="78" r="8"/>
+        <text class="value" x="908" y="112" text-anchor="middle">15</text>
+        <text class="value" x="770" y="112" text-anchor="middle">10.5</text>
+        <text class="value" x="650" y="112" text-anchor="middle">10.05</text>
+        <text class="value" x="562" y="112" text-anchor="middle">10.005</text>
+
+        <line class="target" x1="500" y1="23" x2="500" y2="130"/>
+        <circle class="goal" cx="500" cy="78" r="26"/>
+        <text x="500" y="86" text-anchor="middle" fill="#0f1421" font-size="25" font-weight="900">10</text>
+        <rect class="blocked-mark" x="462" y="119" width="76" height="24" rx="12"/>
+        <text class="blocked-label" x="500" y="136" text-anchor="middle">0 ÷ 0</text>
+      </svg>
+    </figure>
+    <p class="small rowfx" data-r="10">양쪽 모두 <b>10</b>으로 — 아무도 10을 계산하지 않았는데, 모두가 10이라는 걸 안다</p>
+  </div>
+</section>
+
+<section class="slide" data-act="3막 · 발상의 전환 ★"
+ data-note="<i>오늘의 문장. 크게 한 장으로 못박는다.</i>
+
+&quot;인류의 해답은 이것이었습니다. <b>0초를 포기하는 것.</b>
+0초에 도달하지 말고, 0초를 <b>향해 계속 다가가기만</b> 하자.
+그리고 그 다가가는 방향 끝에 있는 값을 '순간속도'라고 <b>부르기로 하자.</b>
+
+계산이 안 되는 문제를, <b>'계산'에서 '다가감'으로 질문을 바꿔서</b> 해결한 것입니다.
+이것은 수학사에서 가장 위대한 발상 전환 중 하나입니다.&quot;">
+  <div class="stack-lg">
+    <h1>도착하지 않고도,<br><em>어디로 가는지</em> 알 수 있다</h1>
+    <p class="lead step" style="margin-top:1.2em">이것이 <b>극한</b>이다</p>
+    <p class="lead step">질문을 <b>'계산하기'</b> 에서 <b>'다가가기'</b> 로 바꿔서 뚫었다</p>
+  </div>
+</section>
+
+<section class="slide visual-dense" data-act="3막 · 보조 (시간 남으면)"
+ data-note="<i>압축 지점</i> — 시간이 모자라면 이 장을 통째로 건너뛴다.
+
+<b>아르키메데스</b> 정6각형 → 12 → 24 → 48 → 96각형.
+아무리 각을 늘려도 <b>원이 되지는 않는다.</b> 그런데 넓이는 분명히 어떤 값으로 다가간다.
+&quot;도착하지 않아도 안다&quot;의 두 번째 사례.
+
+<b>0.999… = 1</b> 손 들어보게 하기. 같다 / 다르다.
+&quot;이 논쟁, 극한을 배우면 끝납니다&quot; 로 닫고 넘어갈 것. 여기서 결론 내지 말 것.">
+  <div class="stack-lg" style="width:100%">
+    <h2>같은 이야기가 두 번 더</h2>
+    <div class="row">
+      <div class="card step">
+        <span class="tag a">아르키메데스</span>
+        <figure class="scene-box arch-scene" aria-label="정육각형, 정십이각형, 정이십사각형이 원에 가까워지는 과정">
+          <svg viewBox="0 0 360 140" role="img">
+            <circle class="circle-guide" cx="75" cy="70" r="44"/>
+            <circle class="circle-guide" cx="180" cy="70" r="44"/>
+            <circle class="circle-guide" cx="285" cy="70" r="44"/>
+            <polygon class="poly" fill="#182c3b" stroke="#5ec8f2" points="75,26 113.1,48 113.1,92 75,114 36.9,92 36.9,48"/>
+            <polygon class="poly" fill="#182c3b" stroke="#5ec8f2" points="180,26 202,31.9 218.1,48 224,70 218.1,92 202,108.1 180,114 158,108.1 141.9,92 136,70 141.9,48 158,31.9"/>
+            <polygon class="poly" fill="#182c3b" stroke="#5ec8f2" points="285,26 296.4,27.5 307,31.9 316.1,38.9 323.1,48 327.5,58.6 329,70 327.5,81.4 323.1,92 316.1,101.1 307,108.1 296.4,112.5 285,114 273.6,112.5 263,108.1 253.9,101.1 246.9,92 242.5,81.4 241,70 242.5,58.6 246.9,48 253.9,38.9 263,31.9 273.6,27.5"/>
+            <text x="75" y="133" text-anchor="middle" fill="#8b96ad" font-size="16">6</text>
+            <text x="180" y="133" text-anchor="middle" fill="#8b96ad" font-size="16">12</text>
+            <text x="285" y="133" text-anchor="middle" fill="#8b96ad" font-size="16">24</text>
+          </svg>
+        </figure>
+        <h3>정6각형 → 12 → 24 → 48 → 96</h3>
+        <p style="margin-top:.5em">아무리 각을 늘려도 <b>원은 아니다.</b><br>그런데 넓이는 분명히 어떤 값으로 다가간다.</p>
+      </div>
+      <div class="card step">
+        <span class="tag b">0.999… = 1 ?</span>
+        <figure class="scene-box arch-scene" aria-label="0.9, 0.99, 0.999가 수직선 위에서 1로 다가가는 과정">
+          <svg viewBox="0 0 360 140" role="img">
+            <line class="number-line" x1="30" y1="72" x2="330" y2="72"/>
+            <line class="to-one" x1="52" y1="72" x2="304" y2="72"/>
+            <path fill="#5ec8f2" d="M318 72l-18-11v22z"/>
+            <circle class="number-dot" cx="72" cy="72" r="8" fill="#5ec8f2"/>
+            <circle class="number-dot" cx="176" cy="72" r="8" fill="#5ec8f2"/>
+            <circle class="number-dot" cx="256" cy="72" r="8" fill="#5ec8f2"/>
+            <circle class="one-dot" cx="318" cy="72" r="11" fill="#ffc857"/>
+            <text x="72" y="48" text-anchor="middle" fill="#cdd5e4" font-size="17">0.9</text>
+            <text x="176" y="48" text-anchor="middle" fill="#cdd5e4" font-size="17">0.99</text>
+            <text x="256" y="48" text-anchor="middle" fill="#cdd5e4" font-size="17">0.999</text>
+            <text x="318" y="40" text-anchor="middle" fill="#ffc857" font-size="24">1</text>
+            <text x="180" y="121" text-anchor="middle" fill="#8b96ad" font-size="17">점점 가까이</text>
+          </svg>
+        </figure>
+        <h3>같다 / 다르다 — 하나를 선택</h3>
+        <p style="margin-top:.5em">이 논쟁도 <b>극한을 배우면 끝납니다.</b></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 4막 ═══════════ -->
+<section class="slide visual-dense" data-act="4막 · 역사"
+ data-note="&quot;흥미롭게도 미적분이 <b>극한보다 먼저</b> 만들어졌습니다.
+1600년대에 뉴턴과 라이프니츠가 미적분을 만들었습니다.
+행성의 궤도와 대포알의 궤적까지 계산했습니다. <b>계산은 놀라울 만큼 잘 맞았습니다.</b>
+하지만 <b>왜 맞는지는 아무도 설명하지 못했습니다.</b>&quot;
+
+<i>압축 지점</i> — 시간이 밀리면 이 장을 30초로 줄이고 바로 다음 장(h의 반칙)으로.">
+  <div class="stack-lg">
+    <p class="kicker">1600년대 · 뉴턴 &amp; 라이프니츠</p>
+    <h2>미적분이 <em>먼저</em>,<br>극한이 <em>나중</em>이었다</h2>
+    <figure class="scene-box success-scene" aria-label="미적분으로 계산한 행성 궤도와 대포알 궤적">
+      <svg viewBox="0 0 920 190" role="img">
+        <line x1="460" y1="24" x2="460" y2="166" stroke="#2a3448" stroke-width="3"/>
+        <ellipse class="orbit" cx="225" cy="94" rx="154" ry="63" fill="none" stroke="#5ec8f2"/>
+        <circle class="sun" cx="225" cy="94" r="24" fill="#ffc857"/>
+        <circle class="planet" cx="363" cy="66" r="12" fill="#5ec8f2"/>
+        <path d="M352 48l22 8-14 19" fill="none" stroke="#5ec8f2" stroke-width="3"/>
+        <text x="225" y="178" text-anchor="middle" fill="#8b96ad" font-size="19">행성의 궤도</text>
+
+        <line class="ground" x1="520" y1="146" x2="870" y2="146"/>
+        <path d="M535 141l25-28 27 12-24 24z" fill="#8b96ad"/>
+        <path class="trajectory" d="M566 119Q694 10 831 128" fill="none" stroke="#ffc857"/>
+        <circle class="target-ring" cx="833" cy="132" r="19"/>
+        <circle cx="833" cy="132" r="5" fill="#ff6b6b"/>
+        <text x="695" y="178" text-anchor="middle" fill="#8b96ad" font-size="19">대포알의 궤적</text>
+      </svg>
+    </figure>
+    <p class="lead step">행성 궤도와 대포알 궤적까지 계산했다 &mdash; <b>놀라울 만큼 잘 맞았다.</b></p>
+    <p class="lead step" style="color:var(--danger)">그런데 <b>왜 맞는지는 아무도 설명하지 못했습니다.</b></p>
+  </div>
+</section>
+
+<section class="slide" data-act="4막 · 역사"
+ data-note="당시 논리를 두 단계로 보여준다.
+1단계: 아주 작은 시간 h로 <b>나눈다</b> → h는 0이 아니어야 나눌 수 있다
+2단계: h는 너무 작으니까 <b>지워버린다</b> → 여기선 h가 0이다
+
+&quot;같은 h가 앞에서는 0이 아니고 뒤에서는 0입니다. <b>논리적으로 반칙입니다.</b>&quot;
+
+학생이 &quot;그래도 답은 맞습니다&quot;라고 하면:
+&quot;그렇습니다. 답은 맞았습니다. 그래서 <b>100년 넘게 그대로 사용했습니다.</b> 바로 그 점이 더 이상합니다.&quot;">
+  <div class="stack-lg" style="width:100%">
+    <h2>당시의 논리</h2>
+    <div class="row">
+      <div class="card step">
+        <span class="tag a">1단계</span>
+        <h3>아주 작은 시간 <em>h</em> 로 나눈다</h3>
+        <p style="margin-top:.5em">→ <em>h</em> 는 <b>0이 아니어야</b> 나눌 수 있다</p>
+      </div>
+      <div class="card step">
+        <span class="tag c">2단계</span>
+        <h3><em>h</em> 는 너무 작으니까 지워버린다</h3>
+        <p style="margin-top:.5em">→ 여기선 <em>h</em> 가 <b>0</b> 이 된다</p>
+      </div>
+    </div>
+    <div class="h-conflict step" style="margin-top:.6em">
+      <span class="logic-term blue"><em>h</em> ≠ 0</span>
+      <span class="same-h">같은 <em>h</em></span>
+      <span class="logic-term red"><em>h</em> = 0</span>
+      <span class="rule-stamp">반칙</span>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-act="4막 · 역사"
+ data-note="<i>이 한 장이 오래 남는다. 천천히 읽어줄 것.</i>
+
+1734년, 버클리 주교가 『해석학자(The Analyst)』를 씁니다.
+수학을 앞세워 신앙을 미신이라 비웃던 수학자에게 되받아친 글입니다.
+
+&quot;그렇게 정확하다는 당신들의 그 무한소는 대체 뭡니까?
+0도 아니고 0이 아닌 것도 아닌 그것 —
+<b>사라진 양의 유령</b> 아닙니까?&quot;
+
+&quot;유령은 안 믿는다면서, 계산에서는 유령을 쓰고 있군요.&quot;">
+  <div class="stack-lg">
+    <p class="kicker">1734년 · 버클리 주교</p>
+    <h1 style="color:var(--accent)">&ldquo;그것은<br>사라진 양의 <em style="color:var(--accent)">유령</em>인가?&rdquo;</h1>
+    <p class="lead step" style="margin-top:1.4em">0도 아니고, 0이 아닌 것도 아닌 그것</p>
+  </div>
+</section>
+
+<section class="slide visual-dense" data-act="4막 · 역사"
+ data-note="&quot;이 조롱에 수학자들은 <b>100년 넘게</b> 완전한 답을 내놓지 못했습니다.
+1821년 코시가 방향을 세웠고, 이후 바이어슈트라스가 논리를 완성했습니다.
+그 답이 바로 <b>극한</b>이었습니다.
+
+'무한히 작은 유령 같은 수'를 없애고,
+<b>'다가간다'는 개념만으로</b> 미적분 전체를 다시 세운 것입니다.&quot;
+
+<i>연도 정확히</i> 버클리 1734 → 코시 1821 (87년) → 바이어슈트라스로 마무리 (약 130년).
+&quot;150년&quot;이라고 하지 말 것.">
+  <div class="stack-lg">
+    <p class="kicker">1821년 코시 · 그 뒤 바이어슈트라스</p>
+    <h2>답이 나오기까지 <em>100년이 넘게</em> 걸렸다</h2>
+    <figure class="scene-box history-timeline" aria-label="1734년 버클리에서 1821년 코시와 바이어슈트라스로 이어지는 역사적 시간선">
+      <svg viewBox="0 0 930 145" role="img">
+        <line class="timeline-line" x1="82" y1="72" x2="848" y2="72"/>
+        <circle cx="105" cy="72" r="16" fill="#ff6b6b" stroke="#0f1421" stroke-width="4"/>
+        <circle class="era hot" cx="465" cy="72" r="19" fill="#ffc857"/>
+        <circle class="era" cx="825" cy="72" r="16" fill="#5ec8f2"/>
+        <text x="105" y="37" text-anchor="middle" fill="#ff6b6b" font-size="19">1734</text>
+        <text x="105" y="121" text-anchor="middle" fill="#cdd5e4" font-size="18">버클리의 비판</text>
+        <text x="465" y="34" text-anchor="middle" fill="#ffc857" font-size="22">1821</text>
+        <text x="465" y="121" text-anchor="middle" fill="#cdd5e4" font-size="18">코시의 극한</text>
+        <text x="825" y="37" text-anchor="middle" fill="#5ec8f2" font-size="19">19세기 후반</text>
+        <text x="825" y="121" text-anchor="middle" fill="#cdd5e4" font-size="18">바이어슈트라스</text>
+      </svg>
+    </figure>
+    <p class="lead step">그리고 그 답이 &mdash; <b>극한</b>이었습니다.</p>
+    <p class="lead step">'무한히 작은 유령 같은 수'를 없애고,<br><b>'다가간다'는 개념만으로</b> 미적분을 처음부터 다시 세웠습니다.</p>
+  </div>
+</section>
+
+<section class="slide visual-dense" data-act="4막 · 역사"
+ data-note="<i>설득의 결정타. 교과서 순서에 대한 답.</i>
+
+&quot;그래서 교과서는 극한을 가장 앞에 둡니다.
+단순히 단원 순서를 그렇게 정한 것이 아닙니다.
+<b>극한 없이 배우는 미적분은 1700년대 수준</b>입니다.
+공식은 외우는데 왜 맞는지는 모르는 상태.
+
+극한을 먼저 하면 미적분이 <b>마술이 아니라 논리</b>가 됩니다.&quot;">
+  <div class="stack-lg">
+    <h1>미적분은<br><em>극한 위에</em> 서 있다</h1>
+    <figure class="scene-box foundation-scene" aria-label="극한이라는 토대 위에 미분, 적분, 연속이 서 있는 구조">
+      <svg viewBox="0 0 880 220" role="img">
+        <rect class="pillar" x="150" y="48" width="145" height="112" rx="8"/>
+        <rect class="pillar" x="368" y="48" width="145" height="112" rx="8"/>
+        <rect class="pillar" x="586" y="48" width="145" height="112" rx="8"/>
+        <rect class="cap" x="132" y="34" width="181" height="22" rx="5"/>
+        <rect class="cap" x="350" y="34" width="181" height="22" rx="5"/>
+        <rect class="cap" x="568" y="34" width="181" height="22" rx="5"/>
+        <text x="222" y="113" text-anchor="middle" fill="#cdd5e4" font-size="27">미분</text>
+        <text x="440" y="113" text-anchor="middle" fill="#cdd5e4" font-size="27">적분</text>
+        <text x="658" y="113" text-anchor="middle" fill="#cdd5e4" font-size="27">연속</text>
+        <rect class="base" x="86" y="157" width="708" height="50" rx="10"/>
+        <text x="440" y="192" text-anchor="middle" fill="#ffc857" font-size="31">극한</text>
+      </svg>
+    </figure>
+    <p class="lead step" style="margin-top:1.2em">극한은 미적분의 <b>토대</b>이고, <b>문법</b>이다</p>
+    <p class="lead step">극한 없이 배우는 미적분은 <b>1700년대 수준</b> &mdash;<br>공식은 외우는데 왜 맞는지는 모르는 상태</p>
+  </div>
+</section>
+
+<!-- ═══════════ 5막 ═══════════ -->
+<section class="slide visual-dense" data-act="5막 · 예고"
+ data-note="한 장으로 학기 전체를 보여준다. 세 줄 다 '다가가는 값'으로 끝난다는 걸 짚을 것.
+
+&quot;세 개의 끝이 모두 같습니다. 앞으로 한 학기 동안 배울 내용은 결국 <b>'다가간다'</b> 하나로 연결됩니다.
+극한은 미적분의 <b>한 단원</b>이 아니라 미적분의 <b>언어</b>입니다.
+극한을 대충 넘어가면, 남은 한 학기를 <b>외국어로 수업 듣는</b> 셈이 됩니다.&quot;">
+  <div class="stack">
+    <h2>앞으로 배울 내용은 모두 <em>이것</em> 하나</h2>
+    <div class="calculus-grid">
+      <article class="concept-card rowfx" data-r="1">
+        <svg viewBox="0 0 300 145" role="img" aria-label="곡선 위 두 점이 가까워져 접선이 되는 모습">
+          <line class="grid-axis" x1="24" y1="120" x2="280" y2="120"/>
+          <line class="grid-axis" x1="42" y1="132" x2="42" y2="16"/>
+          <path class="curve" d="M50 112C92 108 113 86 139 64S202 28 268 25" fill="none" stroke="#5ec8f2" stroke-width="5"/>
+          <line class="helper" x1="89" y1="103" x2="225" y2="34"/>
+          <circle class="focus" cx="121" cy="79" r="7" fill="#ffc857"/>
+          <circle class="focus" cx="194" cy="42" r="7" fill="#ffc857"/>
+          <path d="M179 49l-18 3 10 15" fill="none" stroke="#ffc857" stroke-width="3"/>
+        </svg>
+        <h3>미분</h3>
+        <p>두 점을 <b>점점 가깝게</b> → 평균변화율이 <b>다가가는 값</b><br><span class="small">접선의 기울기</span></p>
+      </article>
+      <article class="concept-card rowfx" data-r="2">
+        <svg viewBox="0 0 300 145" role="img" aria-label="곡선 아래를 잘게 나눈 직사각형으로 채우는 모습">
+          <line class="grid-axis" x1="24" y1="120" x2="280" y2="120"/>
+          <line class="grid-axis" x1="42" y1="132" x2="42" y2="16"/>
+          <rect class="riemann" x="64" y="94" width="31" height="26"/>
+          <rect class="riemann" x="95" y="72" width="31" height="48"/>
+          <rect class="riemann" x="126" y="53" width="31" height="67"/>
+          <rect class="riemann" x="157" y="38" width="31" height="82"/>
+          <rect class="riemann" x="188" y="28" width="31" height="92"/>
+          <rect class="riemann" x="219" y="23" width="31" height="97"/>
+          <path class="curve" d="M60 101C104 77 132 52 171 37S222 22 257 21" fill="none" stroke="#5ec8f2" stroke-width="5"/>
+        </svg>
+        <h3>적분</h3>
+        <p>도형을 <b>점점 잘게</b> 쪼개 더하기 → 그 합이 <b>다가가는 값</b><br><span class="small">넓이</span></p>
+      </article>
+      <article class="concept-card rowfx" data-r="3">
+        <svg viewBox="0 0 300 145" role="img" aria-label="한 점에서 끊기지 않고 이어지는 곡선">
+          <line class="grid-axis" x1="24" y1="120" x2="280" y2="120"/>
+          <line class="grid-axis" x1="42" y1="132" x2="42" y2="16"/>
+          <path class="curve" d="M50 105C91 98 112 48 150 52S210 104 268 36" fill="none" stroke="#5ec8f2" stroke-width="5"/>
+          <line class="helper" x1="150" y1="120" x2="150" y2="52"/>
+          <circle class="focus" cx="150" cy="52" r="8" fill="#ffc857"/>
+          <path d="M126 78l16-18M174 78l-16-18" stroke="#ffc857" stroke-width="3"/>
+        </svg>
+        <h3>연속</h3>
+        <p>그래프가 끊기지 않는다 = <b>다가간 값</b>과 실제 값이 <b>같다</b></p>
+      </article>
+    </div>
+    <p class="lead rowfx" data-r="4" style="margin-top:1.2em">극한은 미적분의 <b>한 단원</b>이 아니라 미적분의 <b>언어</b></p>
+    <p class="small rowfx" data-r="4">대충 넘어가면 남은 한 학기를 외국어로 수업 듣는 셈이 된다</p>
+  </div>
+</section>
+
+<section class="slide" data-act="5막 · 예고"
+ data-note="여기서 처음이자 마지막으로 lim 기호를 보여준다.
+&quot;오늘 이야기 전체의 <b>이름표</b>가 이것입니다. 오늘은 읽는 법만 확인합니다.
+'x가 1로 다가갈 때, f(x)가 다가가는 값'.&quot;
+
+읽는 법만 알려주고 계산은 절대 하지 말 것.">
+  <div class="stack-lg">
+    <p class="kicker">오늘 이야기의 이름표</p>
+    <p class="huge" style="font-size:clamp(46px,10vw,140px)">lim</p>
+    <p class="lead step">&ldquo;다가갈 때, 다가가는 값&rdquo;</p>
+    <p class="small step">읽을 줄만 알면 됩니다. 계산은 다음 시간부터.</p>
+  </div>
+</section>
+
+<section class="slide visual-dense" data-act="5막 · 마무리"
+ data-note="&quot;극한은 미적분으로 건너가는 <b>다리</b>입니다.
+이 다리를 건너면 — 우리는 <b>'순간'을 계산할 수 있게 됩니다.</b>&quot;
+
+1막에서 던진 '순간속도'를 여기서 회수한다.">
+  <div class="stack-lg">
+    <h1>극한은 미적분으로<br>건너가는 <em>다리</em>다</h1>
+    <figure class="scene-box bridge-scene step" aria-label="극한이라는 다리를 건너 순간을 계산하는 미적분으로 이동하는 그림">
+      <svg viewBox="0 0 920 220" role="img">
+        <path class="water" d="M42 189c40-15 72 15 112 0s72 15 112 0 72 15 112 0 72 15 112 0 72 15 112 0 72 15 112 0 72 15 112 0" fill="none"/>
+        <path class="bridge-arc" d="M104 158Q460 10 816 158" fill="none" stroke="#ffc857"/>
+        <line class="deck-line" x1="85" y1="91" x2="835" y2="91"/>
+        <line class="support" x1="190" y1="91" x2="190" y2="126"/>
+        <line class="support" x1="310" y1="91" x2="310" y2="74"/>
+        <line class="support" x1="460" y1="91" x2="460" y2="54"/>
+        <line class="support" x1="610" y1="91" x2="610" y2="74"/>
+        <line class="support" x1="730" y1="91" x2="730" y2="126"/>
+        <circle class="traveler" cx="460" cy="78" r="11" fill="#5ec8f2"/>
+        <text x="98" y="58" fill="#8b96ad" font-size="20">계산 불가</text>
+        <text x="460" y="136" text-anchor="middle" fill="#ffc857" font-size="28">극한</text>
+        <text x="822" y="58" text-anchor="end" fill="#5ec8f2" font-size="20">순간 · 미분 · 적분</text>
+      </svg>
+    </figure>
+    <p class="lead step" style="margin-top:1.2em">이 다리를 건너면 &mdash;<br>우리는 <b>'순간'을 계산할 수 있게 된다</b></p>
+  </div>
+</section>
+
+<section class="slide" data-act="다음 시간"
+ data-note="<i>클로징 발문. 다음 차시로 그대로 이어진다.</i>
+
+&quot;다음 시간 첫 질문입니다.
+<b>'다가간다'는 걸 어떻게 수학적으로, 시비 걸 수 없게 정의할까?</b>
+버클리 주교가 반박할 수 없을 정도로.&quot;
+
+여기서 끝. 답을 주지 말 것.">
+  <div class="stack-lg">
+    <p class="kicker">다음 시간 첫 질문</p>
+    <h2>&lsquo;다가간다&rsquo;는 걸<br>어떻게 <em>시비 걸 수 없게</em> 정의할까?</h2>
+    <p class="lead step" style="margin-top:1.2em">버클리 주교가 <b>못 이길 정도로</b>.</p>
+  </div>
+</section>
+
+</div>
+
+<div id="hud">
+  <div id="act"></div>
+  <div id="num"></div>
+</div>
+
+<aside id="notes">
+  <h4>발표자 노트</h4>
+  <div class="body"></div>
+</aside>
+
+<div id="help"><div>
+  <kbd>→</kbd> / <kbd>Space</kbd> 다음 단계<br>
+  <kbd>←</kbd> 이전 단계<br>
+  <kbd>↓</kbd> / <kbd>↑</kbd> 슬라이드 통째로 이동<br>
+  <kbd>N</kbd> 발표자 노트 열기 / 닫기<br>
+  <kbd>Home</kbd> 처음으로<br>
+  <kbd>F11</kbd> 전체 화면<br>
+  <kbd>?</kbd> 이 도움말 닫기
+</div></div>
+
+<script>
+(function(){
+  const slides = [...document.querySelectorAll('.slide')];
+
+  // 슬라이드마다 등장 요소를 순서대로 모은다.
+  // .step 은 나타난 순서대로, .rowfx 는 data-r 값 순서대로 열린다.
+  const plan = slides.map(s => {
+    const steps = [...s.querySelectorAll('.step')].map((el,i)=>({el,r:i+1}));
+    const rows  = [...s.querySelectorAll('.rowfx')].map(el=>({el,r:+el.dataset.r}));
+    const all = steps.length ? steps : rows;
+    const max = all.reduce((m,x)=>Math.max(m,x.r),0);
+    return {items:all, max};
+  });
+
+  let si = 0, st = 0;
+
+  function render(){
+    slides.forEach((s,i)=>s.classList.toggle('on', i===si));
+    plan[si].items.forEach(({el,r})=> el.classList.toggle('shown', r<=st));
+    document.getElementById('act').innerHTML = slides[si].dataset.act || '';
+    document.getElementById('num').textContent = (si+1) + ' / ' + slides.length;
+    document.getElementById('bar').style.width = ((si+1)/slides.length*100) + '%';
+    document.querySelector('#notes .body').innerHTML =
+      slides[si].dataset.note || '<span style="color:#59637a">노트 없음</span>';
+  }
+
+  function go(d){
+    if(d>0){
+      if(st < plan[si].max){ st++; }
+      else if(si < slides.length-1){ si++; st=0; }
+    }else{
+      if(st > 0){ st--; }
+      else if(si > 0){ si--; st = plan[si].max; }
+    }
+    render();
+  }
+  function jump(d){
+    const n = si + d;
+    if(n<0 || n>=slides.length) return;
+    si = n; st = 0; render();
+  }
+
+  addEventListener('keydown', e=>{
+    const k = e.key;
+    if(k==='ArrowRight'||k===' '||k==='PageDown'){ e.preventDefault(); go(1); }
+    else if(k==='ArrowLeft'||k==='PageUp'){ e.preventDefault(); go(-1); }
+    else if(k==='ArrowDown'){ e.preventDefault(); jump(1); }
+    else if(k==='ArrowUp'){ e.preventDefault(); jump(-1); }
+    else if(k==='Home'){ si=0; st=0; render(); }
+    else if(k==='End'){ si=slides.length-1; st=plan[si].max; render(); }
+    else if(k==='n'||k==='N'||k==='ㅜ'){ document.getElementById('notes').classList.toggle('on'); }
+    else if(k==='?'||k==='/'){ document.getElementById('help').classList.toggle('on'); }
+    else if(k==='Escape'){ document.getElementById('help').classList.remove('on'); }
+  });
+
+  // 화면 왼쪽 25% 클릭 = 뒤로, 나머지 = 앞으로
+  addEventListener('click', e=>{
+    if(e.target.closest('#notes')) return;
+    const help = document.getElementById('help');
+    if(help.classList.contains('on')){ help.classList.remove('on'); return; }
+    go(e.clientX < innerWidth*0.25 ? -1 : 1);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
