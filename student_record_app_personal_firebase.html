@@ -3690,8 +3690,16 @@ async function callAI(prompt, maxTokens=1000){
 // ── Auth 함수 ──────────────────────────────────────────────────
 async function signInWithGoogle(){
   const provider=new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({prompt:'select_account'});
   try{await auth.signInWithPopup(provider);}
-  catch(e){console.error('로그인 실패',e);alert('로그인에 실패했습니다.');}
+  catch(e){
+    console.error('로그인 실패',e);
+    if(e.code==='auth/popup-blocked'||e.code==='auth/popup-closed-by-user'){
+      alert('로그인 창이 닫혔거나 팝업이 차단되었습니다.\n브라우저 팝업 허용 후 다시 시도해주세요.');
+    }else{
+      alert('로그인에 실패했습니다.\n('+(e.code||'')+') '+(e.message||''));
+    }
+  }
 }
 async function doSignOut(){
   if(!confirm('로그아웃하시겠습니까?'))return;
