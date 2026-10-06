@@ -74,6 +74,7 @@ html,body{height:100%;font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun G
 .chip.a-동아리{background:#CCFBF1;color:#0F766E;border-color:#0D9488;font-weight:700}
 .chip.a-교과{background:var(--slate-l);color:var(--slate);border-color:var(--slate);font-weight:700}
 .chip.a-학종분석{background:#F5F3FF;color:#6D28D9;border-color:#7C3AED;font-weight:700}
+.chip.a-초안{background:#ECFDF5;color:#047857;border-color:#059669;font-weight:700}
 input[type=date]{padding:3px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;background:#fff;color:var(--text);outline:none;cursor:pointer;height:28px}
 input[type=date].has-val{background:var(--blue-l);border-color:#93C5FD}
 .fb-search{margin-left:auto;padding:3px 11px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;width:130px;outline:none;background:#fff;color:var(--text);height:28px}
@@ -173,6 +174,7 @@ input[type=date].has-val{background:var(--blue-l);border-color:#93C5FD}
 .bdg-동아리{color:#0F766E;background:#CCFBF1}
 .bdg-교과{color:var(--slate);background:var(--slate-l)}
 .bdg-학종분석{color:#6D28D9;background:#F5F3FF;border:1px solid #DDD6FE}
+.bdg-초안{color:#047857;background:#ECFDF5;border:1px solid #A7F3D0}
 
 /* ── STUDENT DETAIL ── */
 .stu-hd{padding:13px 22px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0}
@@ -227,6 +229,7 @@ input[type=date].has-val{background:var(--blue-l);border-color:#93C5FD}
 .to-동아리.on{background:#CCFBF1;color:#0F766E;border-color:#0D9488;font-weight:700}
 .to-교과.on{background:var(--slate-l);color:var(--slate);border-color:var(--slate);font-weight:700}
 .to-학종분석.on{background:#F5F3FF;color:#6D28D9;border-color:#7C3AED;font-weight:700}
+.to-초안.on{background:#ECFDF5;color:#047857;border-color:#059669;font-weight:700}
 
 /* ── STUDENT PICKER ── */
 .picker-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
@@ -491,9 +494,11 @@ const TIMETABLE={"1학기":{"7":{"1":{"s":{"1":{"월":{"s":"영어","t":"이정�
 // ────────────────────── CONSTANTS ──────────────────────
 const SK='hakgun2026_v1';
 const ALL_CLS=[{id:'c1',name:'1반',hr:false},{id:'c2',name:'2반',hr:false},{id:'c3',name:'3반',hr:false},{id:'c4',name:'4반',hr:false},{id:'c5',name:'5반',hr:false},{id:'c6',name:'6반',hr:false},{id:'c7',name:'7반',hr:true},{id:'c8',name:'8반',hr:false},{id:'c9',name:'9반',hr:false}];
-const TYPES_HR=['자율','진로','행동특성','동아리','상담메모','교과','학종분석'];
+const TYPES_HR=['자율','진로','행동특성','동아리','상담메모','교과','학종분석','초안'];
 const TYPE_LINK='연결됨';
-const TYPES_SB=['자율','진로','행동특성','동아리','상담메모','교과','학종분석'];
+// AI가 만든 결과물 유형: 활동 기록이 아니므로 AI 입력·자동 분류에서 뺀다
+const AI_TYPES=['학종분석','초안'];
+const TYPES_SB=['자율','진로','행동특성','동아리','상담메모','교과','학종분석','초안'];
 
 // ────────────────────── APP STATE ──────────────────────
 const emptyApp=()=>({classes:ALL_CLS,students:{},records:{},hrid:'c7',apiKey:'',todos:{},contacts:{},visibleCls:null,menstrual:{},schoolName:'',maskExtra:''});
@@ -504,7 +509,7 @@ let UI={cid:'c7', sid:null, view:'class', ft:'전체', fd:'', sq:'', modal:null,
 let AR={type:'', date:'', content:'', sids:[], q:''};
 let FU={step:'upload', items:[], fname:'', err:'', forceType:'', date:''};
 let IMP={preview:null, err:''};
-let DR={tab:'', tabs:[], text:'', loading:false, selectedRecs:[]};
+let DR={tab:'', tabs:[], text:'', err:'', loading:false, selectedRecs:[]};
 let ANADATA=null;
 let _extractedText='';
 
@@ -546,7 +551,7 @@ function searchStudents(q){
   }).slice(0,10);
 }
 const badge=t=>`<span class="bdg bdg-${t}">${t}</span>`;
-const tcol=t=>({자율:'#1D4ED8',진로:'#6D28D9',행동특성:'#065F46',상담메모:'#92400E',교과:'#1E293B'}[t]||'#6B7280');
+const tcol=t=>({자율:'#1D4ED8',진로:'#6D28D9',행동특성:'#065F46',상담메모:'#92400E',교과:'#1E293B',초안:'#047857'}[t]||'#6B7280');
 
 // ────────────────────── STORAGE ──────────────────────
 // recordText를 제거한 students 사본 반환 (Firestore 1MB 한도 초과 방지)
@@ -1044,7 +1049,7 @@ function renderStudentView(){
       dates.forEach(d=>{
         h+=`<div class="date-grp"><div class="date-lbl">${fmtD(d)}</div>`;
         byDate[d].forEach(r=>{
-          if(r.type==='학종분석'){
+          if(AI_TYPES.includes(r.type)){
           const preview=esc(r.content).slice(0,80)+'...';
           h+=`<div class="rec-card rec-collapsible" data-rid="${r.id}" id="rc-${r.id}">
             <div style="flex-shrink:0;padding-top:1px">${badge(r.type)}</div>
@@ -1308,8 +1313,8 @@ function renderSummary(){
   const cls=getCls();const stu=getStu();
   if(!stu){UI.view='student';renderStudentView();return;}
   const allRecs=getRecs(UI.cid,UI.sid);
-  const TYPES_ALL=['자율','진로','행동특성','동아리','상담메모','교과','학종분석'];
-  const typeColors={'자율':'#1D4ED8','진로':'#6D28D9','행동특성':'#065F46','동아리':'#0D9488','상담메모':'#D97706','교과':'#1E293B','학종분석':'#7C3AED'};
+  const TYPES_ALL=['자율','진로','행동특성','동아리','상담메모','교과','학종분석','초안'];
+  const typeColors={'자율':'#1D4ED8','진로':'#6D28D9','행동특성':'#065F46','동아리':'#0D9488','상담메모':'#D97706','교과':'#1E293B','학종분석':'#7C3AED','초안':'#047857'};
   const typeBg={'자율':'#DBEAFE','진로':'#EDE9FE','행동특성':'#D1FAE5','상담메모':'#FEF3C7','교과':'#E0EEFF'};
 
   let sections='';
@@ -1413,7 +1418,7 @@ function renderAllRecs(){
     dates.forEach(date=>{
       h+=`<div class="allrec-group"><div class="allrec-group-lbl">${fmtD(date)} <span style="color:var(--border)">|</span> ${byDate[date].length}건</div>`;
       byDate[date].forEach(({s,r})=>{
-        const isCollapse=r.type==='학종분석';
+        const isCollapse=AI_TYPES.includes(r.type);
         if(isCollapse){
           const preview=esc(r.content).slice(0,80)+'...';
           h+=`<div class="rec-card rec-collapsible" data-rid="${r.id}" id="rc-${r.id}">
@@ -1795,7 +1800,7 @@ function confDel(rid){if(confirm('이 기록을 삭제하시겠습니까?')){del
 
 // ────────────────────── MODAL SYSTEM ──────────────────────
 function openMd(type){UI.modal=type;drawModal();}
-function closeMd(){UI.modal=null;document.getElementById('ov').innerHTML='';AR={type:'',date:'',content:'',sids:[],q:''};FU={step:'upload',items:[],fname:'',err:''};IMP={preview:null,err:''};DR={tab:'',text:'',loading:false};ANADATA=null;}
+function closeMd(){UI.modal=null;document.getElementById('ov').innerHTML='';AR={type:'',date:'',content:'',sids:[],q:''};FU={step:'upload',items:[],fname:'',err:''};IMP={preview:null,err:''};DR={tab:'',text:'',err:'',loading:false};ANADATA=null;}
 function drawModal(){
   const m=UI.modal;if(!m)return;
   if(m==='add')showAdd();
@@ -1804,7 +1809,7 @@ function drawModal(){
   else if(m==='import')showImport();
   else if(m==='addOne')showAddOne();
   else if(m==='settings')showSettings();
-  else if(m==='draft'){DR.tabs=[];DR.selectedRecs=[];DR.text='';DR.loading=false;showDraft();}
+  else if(m==='draft'){DR.tabs=[];DR.selectedRecs=[];DR.text='';DR.err='';DR.loading=false;showDraft();}
   else if(m==='analysis')showAnalysis();
 }
 function wrapMd(title,body,sz=''){
@@ -2128,7 +2133,7 @@ async function fuFile(file){
   const cls=getCls();const stds=getStds(UI.cid);
   const types=clsTypes(cls);
   const sListTxt=stds.map(s=>`${s.number}번 ${s.name}`).join(', ');
-  const prompt=`이 문서에서 학생별 활동 정보를 추출해주세요.\n학생 목록: ${sListTxt}\n활동 유형(반드시 이 중에서): ${types.join(', ')}\n\nJSON 배열만 응답(다른 텍스트 없이):\n[{"who":"이름 또는 번호","type":"활동유형","content":"활동내용","date":"YYYY-MM-DD"}]`;
+  const prompt=`이 문서에서 학생별 활동 정보를 추출해주세요.\n학생 목록: ${sListTxt}\n활동 유형(반드시 이 중에서): ${types.filter(t=>!AI_TYPES.includes(t)).join(', ')}\n\nJSON 배열만 응답(다른 텍스트 없이):\n[{"who":"이름 또는 번호","type":"활동유형","content":"활동내용","date":"YYYY-MM-DD"}]`;
   try{
     let msgContent;
     if(file.name.toLowerCase().endsWith('.pdf')){
@@ -2395,13 +2400,17 @@ function showDraft(){
   let resultHtml='';
   if(DR.loading){
     resultHtml=`<div class="ai-loading"><div style="font-size:24px;margin-bottom:10px">✦</div><div>초안 생성 중...</div></div>`;
+  } else if(DR.err){
+    resultHtml=`<div style="margin-top:10px;padding:10px 12px;border-radius:9px;background:var(--red-l);color:var(--red);font-size:13px">${esc(DR.err)}</div>
+      <div class="modal-foot"><button class="btn btn-pri btn-sm" onclick="drGen()">다시 시도</button></div>`;
   } else if(DR.text){
-    resultHtml=`<div style="margin-top:10px;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">생성된 초안</div>
-      <div class="ai-box" id="dr-box">${esc(DR.text)}</div>
+    resultHtml=`<div style="margin-top:10px;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">생성된 초안 <span style="font-weight:500;color:var(--soft)">· 직접 고친 뒤 저장할 수 있습니다</span></div>
+      <textarea class="ai-box" id="dr-box" style="width:100%;font-family:inherit;resize:vertical;outline:none" oninput="DR.text=this.value">${esc(DR.text)}</textarea>
       <div class="modal-foot">
         <button class="btn btn-sec btn-sm" onclick="drCopy()">복사</button>
         <button class="btn btn-sec btn-sm" onclick="DR.text='';showDraft()">초기화</button>
-        <button class="btn btn-pri btn-sm" onclick="drGen()">재생성</button>
+        <button class="btn btn-sec btn-sm" onclick="drGen()">재생성</button>
+        <button class="btn btn-pri btn-sm" onclick="drSave()">📌 기록으로 저장</button>
       </div>`;
   } else {
     resultHtml=`<div class="modal-foot" style="margin-top:10px">
@@ -2418,7 +2427,7 @@ function drToggleTab(t){
   if(DR.tabs.includes(t))DR.tabs=DR.tabs.filter(x=>x!==t);
   else DR.tabs.push(t);
   if(!DR.tabs.length)DR.tabs=[t]; // 최소 1개
-  DR.text='';DR.selectedRecs=[];showDraft();
+  DR.text='';DR.err='';DR.selectedRecs=[];showDraft();
 }
 function drToggleRec(id){
   if(DR.selectedRecs.includes(id))DR.selectedRecs=DR.selectedRecs.filter(x=>x!==id);
@@ -2433,7 +2442,15 @@ function drSelectAll(){
   showDraft();
 }
 function drClearAll(){DR.selectedRecs=[];showDraft();}
-function drCopy(){const t=document.getElementById('dr-box');if(t)navigator.clipboard.writeText(t.innerText);}
+function drCopy(){const t=document.getElementById('dr-box');if(t)navigator.clipboard.writeText(t.value);}
+function drSave(){
+  const t=document.getElementById('dr-box');
+  const text=(t?t.value:DR.text).trim();
+  if(!text)return;
+  addRecords(UI.cid,[UI.sid],{date:today(),type:'초안',content:`[${DR.tabs.join('·')}]\n${text}`});
+  closeMd();render();
+  alert('생기부 초안이 기록으로 저장되었습니다.\n학생 화면의 \'초안\' 유형에서 볼 수 있습니다.');
+}
 async function drGen(){
   const stu=getStu();
   const typeMap={세특:'교과',자율활동:'자율',진로활동:'진로',행동특성:'행동특성'};
@@ -2442,13 +2459,13 @@ async function drGen(){
   const recs=DR.selectedRecs.length
     ?allRecs.filter(r=>DR.selectedRecs.includes(r.id))
     :allRecs;
-  if(!recs.length){DR.text='선택된 기록이 없습니다.';DR.loading=false;showDraft();return;}
+  if(!recs.length){DR.text='';DR.err='선택된 기록이 없습니다.';DR.loading=false;showDraft();return;}
   const tabLabel=DR.tabs.join('·');
   const txt=recs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`[${r.date}][${r.type}] ${maskForAI(r.content,stu)}`).join('\n');
-  DR.loading=true;DR.text='';showDraft();
+  DR.loading=true;DR.text='';DR.err='';showDraft();
   try{
     DR.text=(await callAI(`이 학생의 활동 기록 (■■■는 개인정보 보호를 위해 가린 부분):\n\n${txt}\n\n위를 바탕으로 학교생활기록부 ${tabLabel} 항목에 적합한 문체로 350~500자의 초안을 작성해주세요. 숫자·날짜는 그대로 활용하고, 입력자 관점이 아닌 학생 행동·성취 중심으로 서술하세요. 초안만 출력하세요.`,'low')).trim();
-  }catch(e){DR.text='오류: '+e.message;}
+  }catch(e){DR.text='';DR.err='초안을 만들지 못했습니다: '+e.message;}
   DR.loading=false;showDraft();
 }
 
@@ -2509,7 +2526,7 @@ function saveAnalysisRecord(){
 async function anaMode(mode){
   const stu=getStu();
   if(mode==='records'){
-    const recs=getRecs(UI.cid,UI.sid);
+    const recs=getRecs(UI.cid,UI.sid).filter(r=>!AI_TYPES.includes(r.type));
     if(!recs.length){alert('기록이 없습니다.');return;}
     const txt=recs.map(r=>`[${r.type}][${r.date}] ${maskForAI(r.content,stu)}`).join('\n');
     const deptPart=stu.dept?`희망 계열: ${stu.dept}\n`:'';
