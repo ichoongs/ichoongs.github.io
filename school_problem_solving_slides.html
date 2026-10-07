@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>우리 학교를 조금 더 나은 곳으로</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --card:#ffffff;
+      --text:#172033;
+      --muted:#667085;
+      --accent:#4f46e5;
+      --accent2:#eef2ff;
+      --line:#e5e7eb;
+      --good:#0f766e;
+      --goodbg:#ecfdf5;
+      --warn:#92400e;
+      --warnbg:#fff7ed;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR","Apple SD Gothic Neo",sans-serif;background:var(--bg)}
+    body{overflow:hidden}
+    .deck{height:100vh;display:flex;flex-direction:column}
+    .topbar{
+      height:52px;display:flex;align-items:center;justify-content:space-between;
+      padding:0 18px;color:#fff;background:rgba(15,23,42,.92);backdrop-filter:blur(8px);
+      border-bottom:1px solid rgba(255,255,255,.1)
+    }
+    .titlemini{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .counter{font-size:13px;opacity:.8}
+    .stage{flex:1;position:relative;overflow:hidden}
+    .slide{
+      position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+      padding:34px 22px 86px;
+      background:linear-gradient(145deg,#f7f8fc,#eef2ff);
+    }
+    .slide.active{display:flex}
+    .panel{
+      width:min(1100px,100%);height:min(680px,100%);
+      background:#fff;border-radius:26px;box-shadow:0 28px 70px rgba(0,0,0,.22);
+      padding:42px 46px;overflow:auto;
+    }
+    .hero{
+      background:linear-gradient(135deg,#4338ca,#7c3aed);color:#fff;
+      display:flex;flex-direction:column;justify-content:center
+    }
+    h1{font-size:clamp(36px,6vw,72px);line-height:1.08;margin:0 0 18px}
+    h2{font-size:clamp(28px,4vw,44px);margin:0 0 20px;line-height:1.2}
+    h3{font-size:22px;margin:22px 0 10px}
+    p,li,td,th{font-size:18px;line-height:1.65}
+    .lead{font-size:22px;line-height:1.6}
+    .tag{
+      display:inline-block;width:max-content;padding:7px 12px;border-radius:999px;
+      background:rgba(255,255,255,.16);font-weight:800;margin-bottom:16px
+    }
+    .quote{
+      background:var(--accent2);border-left:5px solid var(--accent);border-radius:14px;
+      padding:18px 20px;font-size:22px;font-weight:800;margin-top:18px
+    }
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .card{
+      border:1px solid var(--line);border-radius:16px;padding:16px 18px;background:#fafbff
+    }
+    .card strong{display:block;margin-bottom:4px}
+    .steps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .step{
+      position:relative;border:1px solid var(--line);border-radius:16px;padding:18px 18px 18px 56px;background:#fff
+    }
+    .step span{
+      position:absolute;left:16px;top:18px;width:28px;height:28px;border-radius:50%;
+      background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:800
+    }
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+    th{background:#fafafa;text-align:left}
+    .note{background:var(--goodbg);color:#0f5e4c;border:1px solid #ccefe4;padding:14px 16px;border-radius:12px}
+    .warn{background:var(--warnbg);color:#7c2d12;border:1px solid #fed7aa;padding:14px 16px;border-radius:12px}
+    .schedule{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .schedule .card{min-height:150px}
+    .bigarrow{text-align:center;font-size:44px;margin:10px 0}
+    .footerhint{
+      position:absolute;left:50%;bottom:16px;transform:translateX(-50%);
+      color:#fff;font-size:12px;opacity:.72
+    }
+    .controls{
+      position:absolute;right:18px;bottom:16px;display:flex;gap:8px
+    }
+    button{
+      border:none;border-radius:999px;padding:10px 14px;font-size:15px;font-weight:800;
+      cursor:pointer;background:#fff;color:#111827;box-shadow:0 5px 18px rgba(0,0,0,.18)
+    }
+    button:disabled{opacity:.35;cursor:default}
+    .dots{position:absolute;left:18px;bottom:20px;display:flex;gap:6px;flex-wrap:wrap;max-width:50vw}
+    .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.35)}
+    .dot.active{background:#fff}
+    @media(max-width:760px){
+      .slide{padding:18px 10px 78px}
+      .panel{padding:26px 20px;border-radius:18px}
+      .grid,.steps,.schedule{grid-template-columns:1fr}
+      h1{font-size:42px}
+      h2{font-size:30px}
+      p,li,td,th{font-size:16px}
+      .lead,.quote{font-size:18px}
+      .panel{height:100%}
+      .dots{display:none}
+    }
+  </style>
+</head>
+<body>
+<div class="deck">
+  <div class="topbar">
+    <div class="titlemini">우리 학교를 조금 더 나은 곳으로</div>
+    <div class="counter" id="counter">1 / 9</div>
+  </div>
+
+  <div class="stage">
+
+    <section class="slide active">
+      <div class="panel hero">
+        <div class="tag">학급 문제해결 프로젝트</div>
+        <h1>우리 학교를<br>조금 더 나은 곳으로</h1>
+        <p class="lead">“원래 그런가 보다”에서 멈추지 않고,<br>직접 보고 묻고 조사하고 제안해보는 활동</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="panel">
+        <h2>왜 이 활동을 하나요?</h2>
+        <p class="lead">학교는 우리가 매일 생활하는 작은 사회입니다.</p>
+        <p>불편함을 그냥 지나치지 않고, 문제를 발견하고 다른 사람과 협력해서 해결책을 고민해보는 경험을 해봅니다.</p>
+        <div class="quote">좋은 결과물보다 중요한 것은<br><b>문제를 발견하고, 직접 조사하고, 생각을 수정해가는 과정</b>입니다.</div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="panel">
+        <h2>어떤 문제를 다룰 수 있나요?</h2>
+        <div class="grid">
+          <div class="card"><strong>🚦 안전·교통</strong>등하교 시간 교문 앞 차량과 학생의 혼잡, 위험한 동선</div>
+          <div class="card"><strong>🍽 급식·석식</strong>석식 종이 명렬표 체크, 대기 시간과 동선</div>
+          <div class="card"><strong>📢 정보 전달</strong>학교 공지, 진로·진학 정보 전달 방식</div>
+          <div class="card"><strong>🏫 공간·시설</strong>화장실, 자습공간, 휴게공간, 냉난방·환기</div>
+          <div class="card"><strong>♻️ 환경·행정</strong>불필요한 종이 사용, 수기 확인 절차, 분리배출</div>
+          <div class="card"><strong>📱 생활·디지털</strong>수면, 스마트폰·SNS·생성형 AI 활용과 학습</div>
+        </div>
+        <p class="note" style="margin-top:16px">설문에서 여러분이 이미 적어준 <b>‘학교에서 불편했던 것’</b>이 이 활동의 출발점이 됩니다.</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="panel">
+        <h2>같은 문제도 서로 다르게 볼 수 있어요</h2>
+        <p>예: <b>‘교문 앞 교통 혼잡’</b></p>
+        <table>
+          <thead><tr><th>관심 분야</th><th>바라볼 수 있는 관점</th></tr></thead>
+          <tbody>
+            <tr><td>경찰행정·법</td><td>보행자 안전, 교통 규칙, 책임 주체</td></tr>
+            <tr><td>도시공학·건축</td><td>동선, 공간 배치, 차량 흐름</td></tr>
+            <tr><td>데이터·수학</td><td>시간대별 차량 수, 혼잡도 수치화</td></tr>
+            <tr><td>심리·교육</td><td>학생·학부모의 행동 선택 이유</td></tr>
+            <tr><td>경영·행정</td><td>개선안의 비용·효율성·운영 가능성</td></tr>
+            <tr><td>디자인</td><td>안내 표지, 동선 유도 디자인</td></tr>
+          </tbody>
+        </table>
+        <p class="warn">진로와 억지로 연결할 필요는 없습니다. 같은 문제를 여러 관점에서 바라보는 연습 자체가 중요합니다.</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="panel">
+        <h2>활동은 이렇게 진행합니다</h2>
+        <div class="steps">
+          <div class="step"><span>1</span><b>문제 고르기</b><br>설문에 적은 불편사항을 공유하고 모둠 주제 1개 선정</div>
+          <div class="step"><span>2</span><b>질문 만들기</b><br>“불편하다”를 조사 가능한 질문으로 바꾸기</div>
+          <div class="step"><span>3</span><b>직접 조사하기</b><br>설문·인터뷰·관찰·시간 측정 등으로 실제 자료 모으기</div>
+          <div class="step"><span>4</span><b>분석·해석하기</b><br>자료에서 특징을 찾고 왜 그런지 생각하기</div>
+          <div class="step"><span>5</span><b>개선안 제안하기</b><br>효과·실행 가능성·비용·반대 의견까지 검토하기</div>
+          <div class="step"><span>6</span><b>공유·성찰하기</b><br>무엇을 발견했고 내 생각이 어떻게 달라졌는지 정리하기</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="panel">
+        <h2>몇 시간 안에 끝내는 프로젝트입니다</h2>
+        <p>완벽한 논문이나 보고서를 만드는 활동이 아닙니다.</p>
+        <div class="schedule">
+          <div class="card"><strong>1차시</strong>불편사항 공유<br>주제 선택<br>핵심 질문 만들기</div>
+          <div class="card"><strong>2차시</strong>조사 설계<br>설문·관찰·인터뷰<br>자료 수집</div>
+          <div class="card"><strong>3차시</strong>자료 정리·분석<br>원인 해석<br>개선안 만들기</div>
+          <div class="card"><strong>4차시</strong>짧은 발표<br>질의응답<br>개인 성찰</div>
+        </div>
+        <div class="quote">제한된 시간 안에서 실제 문제를 보고,<br><b>가능한 만큼 조사하고 근거 있는 제안을 만드는 것</b>이 목표입니다.</div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="panel">
+        <h2>모둠 안에서는 서로 다르게 기여해도 됩니다</h2>
+        <div class="grid">
+          <div class="card"><strong>💡 질문을 만드는 사람</strong>문제를 더 구체적인 탐구 질문으로 바꾸기</div>
+          <div class="card"><strong>🔎 조사를 설계하는 사람</strong>설문·관찰·인터뷰 방법 정하기</div>
+          <div class="card"><strong>📊 자료를 보는 사람</strong>수집한 자료에서 특징과 패턴 찾기</div>
+          <div class="card"><strong>🧭 대안을 고민하는 사람</strong>현실적인 해결책과 반대 의견 검토하기</div>
+        </div>
+        <p class="note" style="margin-top:16px"><b>모두가 같은 방식으로 기여할 필요는 없습니다.</b> 각자의 강점을 활용하면 됩니다.</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="panel">
+        <h2>그리고 다음 단계가 있습니다</h2>
+        <div class="grid">
+          <div class="card">
+            <strong>1단계 · 모둠활동</strong>
+            학교생활의 실제 문제를 함께 발견하고 조사하기
+          </div>
+          <div class="card">
+            <strong>2단계 · 개별 보고서 탐구</strong>
+            활동 중 내가 가장 궁금했던 지점을 골라 더 깊게 탐구하기
+          </div>
+        </div>
+        <div class="bigarrow">↓</div>
+        <p class="lead">설문에서 이미 적은 <b>‘관심 있는 탐구 분야’</b>와<br>모둠활동 중 새롭게 생긴 질문을 연결합니다.</p>
+        <div class="quote">모둠에서는 함께 문제를 발견하고,<br>개별 보고서에서는 <b>“나는 이 문제에서 무엇이 가장 궁금했는가?”</b>를 더 깊게 탐구합니다.</div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="panel">
+        <h2>마지막으로</h2>
+        <p class="lead">완벽한 해결책이 아니어도 괜찮습니다.</p>
+        <ul>
+          <li>실제 문제를 발견했는가?</li>
+          <li>직접 자료를 모아봤는가?</li>
+          <li>친구들과 의견을 나누며 생각을 수정했는가?</li>
+          <li>근거를 바탕으로 개선안을 제안했는가?</li>
+          <li>그 과정에서 나만의 다음 질문이 생겼는가?</li>
+        </ul>
+        <div class="quote">“원래 그런가 보다” 대신<br><b>“왜 그럴까?” “어떻게 하면 조금 더 좋아질까?”</b></div>
+      </div>
+    </section>
+
+    <div class="dots" id="dots"></div>
+    <div class="controls">
+      <button id="prev">← 이전</button>
+      <button id="next">다음 →</button>
+    </div>
+    <div class="footerhint">키보드 ← → / 화면 좌우 스와이프 가능</div>
+  </div>
+</div>
+
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  const counter=document.getElementById('counter');
+  const prev=document.getElementById('prev');
+  const next=document.getElementById('next');
+  const dotsBox=document.getElementById('dots');
+  let idx=0, startX=null;
+
+  slides.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='dot'+(i===0?' active':'');
+    d.addEventListener('click',()=>show(i));
+    dotsBox.appendChild(d);
+  });
+
+  function show(i){
+    idx=Math.max(0,Math.min(slides.length-1,i));
+    slides.forEach((s,j)=>s.classList.toggle('active',j===idx));
+    [...dotsBox.children].forEach((d,j)=>d.classList.toggle('active',j===idx));
+    counter.textContent=`${idx+1} / ${slides.length}`;
+    prev.disabled=idx===0;
+    next.disabled=idx===slides.length-1;
+  }
+  prev.onclick=()=>show(idx-1);
+  next.onclick=()=>show(idx+1);
+
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight' || e.key==='PageDown' || e.key===' ') show(idx+1);
+    if(e.key==='ArrowLeft' || e.key==='PageUp') show(idx-1);
+  });
+
+  document.addEventListener('touchstart',e=>{startX=e.changedTouches[0].screenX},{passive:true});
+  document.addEventListener('touchend',e=>{
+    if(startX===null) return;
+    const dx=e.changedTouches[0].screenX-startX;
+    if(Math.abs(dx)>50) dx<0?show(idx+1):show(idx-1);
+    startX=null;
+  },{passive:true});
+
+  show(0);
+</script>
+</body>
+</html>
