@@ -12,6 +12,7 @@
     { key: "DE", label: "D/E", area: "area-de" },
   ];
   const GRADES = ["A", "B", "C", "D", "E"];
+  const TEACHER_NAMES_KEY = "aRateTeacherNames";
   const state = {
     rows: [],
     columns: [],
@@ -19,7 +20,29 @@
     sourceFileName: "",
     lastReport: null,
     neisRows: [],
+    teacherNames: loadTeacherNames(),
   };
+
+  function loadTeacherNames() {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(TEACHER_NAMES_KEY) || "[]");
+      return Array.isArray(saved) ? saved.map((name) => String(name ?? "")) : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveTeacherNames() {
+    try {
+      window.localStorage.setItem(TEACHER_NAMES_KEY, JSON.stringify(state.teacherNames));
+    } catch (error) {
+      // 저장소를 쓸 수 없는 환경에서는 이번 화면에서만 이름을 유지한다
+    }
+  }
+
+  function teacherName(index) {
+    return (state.teacherNames[index] || "").trim() || `교사 ${index + 1}`;
+  }
   let renderTimer = null;
 
   const $ = (id) => document.getElementById(id);
@@ -736,6 +759,7 @@
     if (!Number.isFinite(count)) {
       body.innerHTML = '<tr><td colspan="5">담당 교사 수(1~20명)를 입력하면 교사별 입력값을 보여줍니다.</td></tr>';
       $("neisNote").textContent = "";
+      $("teacherCards").innerHTML = "";
       return [];
     }
     // salt: 평가 행 × 4 + 컷 위치 (2차 A/B는 4 → 추천 컷 세트와 같은 순서)
@@ -762,7 +786,56 @@
     $("neisNote").textContent =
       `교사 ${count}명 기준 나이스 평균은 ${formatCut(SCORE_UNIT / count)}점 간격으로만 만들 수 있어, 예측도 이 평균값으로 계산합니다.`
       + (count > 1 ? " 평균이 소수일 때 나이스의 표시 자리수는 학교 화면에서 확인하세요." : "");
+    renderTeacherCards(rows, count);
     return rows;
+  }
+
+  function teacherValue(set, index) {
+    return Number.isFinite(set.teachers[index]) ? set.teachers[index] : "-";
+  }
+
+  function renderTeacherCards(rows, count) {
+    $("teacherCards").innerHTML = Array.from({ length: count }, (_, index) => `
+      <article class="teacher-card">
+        <div class="teacher-card__head">
+          <span class="teacher-no">${index + 1}</span>
+          <input class="teacher-name" type="text" data-index="${index}" value="${escapeHtml(state.teacherNames[index] || "")}" placeholder="교사 ${index + 1}" aria-label="교사 ${index + 1} 이름">
+          <button class="copy-button" type="button" data-index="${index}">복사</button>
+        </div>
+        <table class="teacher-table">
+          <thead><tr><th>평가</th>${BOUNDARIES.map((boundary) => `<th>${boundary.label}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${rows.map((row) => `
+              <tr><td>${escapeHtml(row.name)}</td>${row.sets.map((set) => `<td>${teacherValue(set, index)}</td>`).join("")}</tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </article>
+    `).join("");
+  }
+
+  function teacherMessage(index) {
+    const lines = state.neisRows.map((row) =>
+      `${row.name}: ${row.sets.map((set, cut) => `${BOUNDARIES[cut].label} ${teacherValue(set, index)}`).join(" / ")}`
+    );
+    return [`[${teacherName(index)}] 나이스 분할점수 입력값`, ...lines].join("\n");
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (error) {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.append(area);
+      area.select();
+      const copied = document.execCommand("copy");
+      area.remove();
+      return copied;
+    }
   }
 
   function renderFinalCuts(cuts) {
@@ -991,7 +1064,7 @@
 
     const teacherCount = config.teacherCount;
     const neisData = [
-      ["평가", "분할점수", "입력한 컷", "나이스 평균", ...Array.from({ length: teacherCount }, (_, index) => `교사${index + 1}`)],
+      ["평가", "분할점수", "입력한 컷", "나이스 평균", ...Array.from({ length: teacherCount }, (_, index) => teacherName(index))],
       ...neisRows.flatMap((row) => row.sets.map((set, index) => [
         row.name, BOUNDARIES[index].label, set.target, set.value, ...set.teachers,
       ])),
@@ -1003,6 +1076,22 @@
     }
     setSheetWidths(neisSheet, [18, 10, 12, 12, ...Array(teacherCount).fill(8)]);
     XLSX.utils.book_append_sheet(workbook, neisSheet, "나이스 입력 세트");
+
+    const usedSheetNames = new Set(workbook.SheetNames);
+    for (let index = 0; index < teacherCount; index += 1) {
+      const name = teacherName(index);
+      let sheetName = safeSheetName(state.teacherNames[index]?.trim() ? name : `교사${index + 1}`);
+      if (usedSheetNames.has(sheetName)) sheetName = safeSheetName(`${sheetName.slice(0, 26)} (${index + 1})`);
+      usedSheetNames.add(sheetName);
+      const teacherSheet = XLSX.utils.aoa_to_sheet([
+        [`${name} 나이스 분할점수 입력값`],
+        [],
+        ["평가", ...BOUNDARIES.map((boundary) => boundary.label)],
+        ...neisRows.map((row) => [row.name, ...row.sets.map((set) => teacherValue(set, index))]),
+      ]);
+      setSheetWidths(teacherSheet, [18, 10, 10, 10, 10]);
+      XLSX.utils.book_append_sheet(workbook, teacherSheet, sheetName);
+    }
 
     const simulationData = [
       ["2차 A/B", "학기말 환산컷", "중앙 A비율", "90% 하한", "90% 상한", "23.9% 초과확률", "판정"],
@@ -1133,6 +1222,22 @@
     .forEach((id) => $(id).addEventListener("input", () => scheduleRender()));
   $("exam2Max").addEventListener("input", () => syncSimulationRange());
   $("teacherCount").addEventListener("input", syncRangeStep);
+  $("teacherCards").addEventListener("input", (event) => {
+    if (!event.target.classList.contains("teacher-name")) return;
+    state.teacherNames[Number(event.target.dataset.index)] = event.target.value;
+    saveTeacherNames();
+  });
+  $("teacherCards").addEventListener("click", async (event) => {
+    const button = event.target.closest(".copy-button");
+    if (!button) return;
+    const copied = await copyText(teacherMessage(Number(button.dataset.index)));
+    button.textContent = copied ? "복사됨" : "복사 실패";
+    button.classList.toggle("copied", copied);
+    window.setTimeout(() => {
+      button.textContent = "복사";
+      button.classList.remove("copied");
+    }, 1500);
+  });
   ["exam1Weight", "exam2Weight"].forEach((id) =>
     $(id).addEventListener("input", (event) => rebalanceWeights(event.target))
   );

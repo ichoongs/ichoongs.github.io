@@ -109,6 +109,12 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0 0; }
 .exam-card.accent { border-left: 3px solid var(--teal); padding-left: 10px; }
 .exam-card > span { align-self: center; color: var(--teal-dark); font-size: 14px; font-weight: 900; }
 .exam-card label { display: block; margin: 0; }
+.exam-card__note { grid-column: 4 / -1; align-self: center; margin: 0; padding: 9px 11px; border-radius: 6px; background: #f3faf7; color: var(--muted); font-size: 12px; }
+.exam-card__note strong { color: var(--teal-dark); }
+.exam2-cuts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.exam2-cuts label { display: block; }
+.exam2-cuts .input-unit { width: 100%; }
+.slider-value small { display: block; color: var(--muted); font-size: 12px; font-weight: 800; }
 .performance-editor { margin-top: 10px; padding: 12px 14px; border: 1px solid #ead8ad; border-radius: 8px; background: #fffcf4; }
 .performance-editor .subheading { align-items: center; }
 .performance-editor .subheading { margin-bottom: 8px; }
@@ -141,6 +147,21 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0 0; }
 .teacher-chips i { min-width: 28px; padding: 2px 5px; border-radius: 4px; background: var(--mint); color: var(--teal-dark); font-size: 11px; font-style: normal; font-weight: 800; }
 .neis-adjusted { display: block; margin-top: 4px; color: #a67417; font-size: 11px; font-weight: 700; }
 .neis-note { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
+.teacher-cards-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.teacher-cards-head strong { color: var(--ink); font-size: 14px; }
+.teacher-cards-head span { color: var(--muted); font-size: 12px; }
+.teacher-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 10px; margin-top: 10px; }
+.teacher-card { border: 1px solid var(--line); border-top: 3px solid var(--teal); border-radius: 8px; background: white; overflow: hidden; }
+.teacher-card__head { display: flex; align-items: center; gap: 8px; padding: 9px 10px; }
+.teacher-card__head .teacher-no { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--mint); color: var(--teal); font-size: 12px; font-weight: 900; }
+.teacher-card__head input[type="text"] { height: 32px; font-weight: 800; }
+.copy-button { flex: 0 0 auto; height: 32px; border: 1px solid var(--teal); border-radius: 5px; background: white; color: var(--teal); padding: 0 11px; font-size: 12px; font-weight: 850; }
+.copy-button:hover { background: #edf8f4; }
+.copy-button.copied { background: var(--teal); color: white; }
+.teacher-table { font-size: 12px; }
+.teacher-table th { position: static; padding: 6px 5px; }
+.teacher-table td { padding: 6px 5px; font-weight: 800; color: var(--teal-dark); }
+.teacher-table th:first-child, .teacher-table td:first-child { padding-left: 10px; text-align: left; color: #385156; font-weight: 700; }
 .method-list { display: grid; gap: 6px; }
 .method { border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px; display: flex; align-items: center; gap: 9px; cursor: pointer; }
 .method.active { border-color: var(--teal); background: #f3faf7; box-shadow: inset 3px 0 var(--teal); }
@@ -280,6 +301,7 @@ footer p { margin: 0; }
   .performance-area .remove-area-button { width: 100%; }
   .exam-card { grid-template-columns: repeat(3, 1fr); }
   .exam-card > span { grid-column: 1 / -1; }
+  .exam-card__note { grid-column: 1 / -1; }
 }
 @media (max-width: 600px) {
   .tool-switcher { align-items: stretch; flex-direction: column; gap: 5px; padding: 9px 12px; }
@@ -305,7 +327,7 @@ footer p { margin: 0; }
   .export-button { width: 100%; }
   .cut-summary__head { flex-direction: column; gap: 3px; }
   .cut-summary__head small { text-align: left; }
-  .final-cut-grid { grid-template-columns: 1fr 1fr; }
+  .final-cut-grid, .exam2-cuts { grid-template-columns: 1fr 1fr; }
   .grade-cards { grid-template-columns: repeat(3, 1fr); }
   .neis-sets .subheading { align-items: flex-start; flex-direction: column; gap: 8px; }
   .neis-guide ol { display: block; }
