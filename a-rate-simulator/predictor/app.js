@@ -4,22 +4,87 @@
   const SIMULATION_COUNT = 1000;
   const RECOMMENDATION_LIMIT = 23.9;
   const EXAM_CORRELATION = 0.8;
+  const SCORE_UNIT = 5;
+  const BOUNDARIES = [
+    { key: "AB", label: "A/B", area: "area-ab" },
+    { key: "BC", label: "B/C", area: "area-bc" },
+    { key: "CD", label: "C/D", area: "area-cd" },
+    { key: "DE", label: "D/E", area: "area-de" },
+  ];
+  const GRADES = ["A", "B", "C", "D", "E"];
   const state = {
     rows: [],
     columns: [],
     touchedWeights: new Set(),
     sourceFileName: "",
     lastReport: null,
+    neisRows: [],
   };
   let renderTimer = null;
 
   const $ = (id) => document.getElementById(id);
   const numericIds = [
     "exam1Max", "exam2Max",
-    "exam1AB", "exam2AB",
+    "exam1AB", "exam1BC", "exam1CD", "exam1DE",
+    "exam2AB", "exam2BC", "exam2CD", "exam2DE",
+    "teacherCount",
     "meanAdjustment",
     "rangeStart", "rangeEnd", "rangeStep",
   ];
+
+  function teacherCountValue() {
+    const count = number("teacherCount");
+    return Number.isInteger(count) && count >= 1 && count <= 20 ? count : NaN;
+  }
+
+  // 교사 N명이 각자 5점 단위로 입력할 때 목표 컷에 가장 가까운 평균과 교사별 입력값.
+  // 평균은 유지한 채 (중심-5, 중심, 중심+5) 세 값을 고루 섞어 모두 같은 값이 되지 않게 하고,
+  // 교사 순서도 칸마다 다르게 둔다. 교사 간 차이는 최대 10점.
+  function neisSet(target, teacherCount, { max = Infinity, salt = 0 } = {}) {
+    if (!Number.isFinite(target) || !Number.isFinite(teacherCount)) {
+      return { target, value: target, teachers: [] };
+    }
+    const units = Math.round(target * teacherCount / SCORE_UNIT + 1e-9);
+    const center = Math.round(units / teacherCount);
+    const offset = units - center * teacherCount; // (+5점 인원) - (-5점 인원)
+    let pairs = Math.max(0, Math.floor((teacherCount - Math.abs(offset) - Math.round(teacherCount / 3)) / 2));
+    if (pairs === 0 && offset === 0 && teacherCount >= 2) pairs = 1;
+    if (center - 1 < 0 || (center + 1) * SCORE_UNIT > max) pairs = 0;
+    const low = Math.max(0, -offset) + pairs;
+    const high = Math.max(0, offset) + pairs;
+    const values = [
+      ...Array(high).fill(center + 1),
+      ...Array(teacherCount - low - high).fill(center),
+      ...Array(low).fill(center - 1),
+    ];
+    const random = seededRandom(units * 131 + teacherCount * 17 + salt * 7919);
+    for (let index = values.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(random() * (index + 1));
+      [values[index], values[swap]] = [values[swap], values[index]];
+    }
+    return {
+      target,
+      value: units * SCORE_UNIT / teacherCount,
+      teachers: values.map((value) => value * SCORE_UNIT),
+    };
+  }
+
+  function formatCut(value) {
+    if (!Number.isFinite(value)) return "-";
+    const rounded = Math.round(value);
+    return Math.abs(value - rounded) < 1e-6 ? format(rounded, 0) : format(value, 2);
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    })[char]);
+  }
+
+  function syncRangeStep() {
+    const count = teacherCountValue();
+    if (Number.isFinite(count)) $("rangeStep").value = Number((SCORE_UNIT / count).toFixed(4));
+  }
 
   function number(id) {
     return finiteNumber($(id).value);
@@ -233,20 +298,39 @@
   }
 
   function settings() {
-    const performanceAreas = [...document.querySelectorAll(".performance-area")].map((area) => ({
-      name: area.querySelector(".area-name").value.trim() || "수행평가",
-      max: finiteNumber(area.querySelector(".area-max").value),
-      weight: finiteNumber(area.querySelector(".area-weight").value),
-      ab: finiteNumber(area.querySelector(".area-ab").value),
-      expected: finiteNumber(area.querySelector(".area-expected").value),
-    }));
+    const teacherCount = teacherCountValue();
+    const snap = (target) => neisSet(target, teacherCount).value;
+    const performanceAreas = [...document.querySelectorAll(".performance-area")].map((area) => {
+      const targets = BOUNDARIES.map((boundary) =>
+        finiteNumber(area.querySelector(`.${boundary.area}`).value)
+      );
+      const cuts = targets.map(snap);
+      return {
+        name: area.querySelector(".area-name").value.trim() || "수행평가",
+        max: finiteNumber(area.querySelector(".area-max").value),
+        weight: finiteNumber(area.querySelector(".area-weight").value),
+        targets,
+        cuts,
+        ab: cuts[0],
+        expected: finiteNumber(area.querySelector(".area-expected").value),
+      };
+    });
+    const exam1Targets = BOUNDARIES.map((boundary) => number(`exam1${boundary.key}`));
+    const exam2Targets = BOUNDARIES.map((boundary) => number(`exam2${boundary.key}`));
+    const exam1Cuts = exam1Targets.map(snap);
+    const exam2Cuts = exam2Targets.map(snap);
     return {
+      teacherCount,
       exam1Max: number("exam1Max"),
       exam2Max: number("exam2Max"),
       exam1Weight: number("exam1Weight"),
       exam2Weight: number("exam2Weight"),
-      exam1AB: number("exam1AB"),
-      exam2AB: number("exam2AB"),
+      exam1Targets,
+      exam2Targets,
+      exam1Cuts,
+      exam2Cuts,
+      exam1AB: exam1Cuts[0],
+      exam2AB: exam2Cuts[0],
       performanceAreas,
       meanAdjustment: number("meanAdjustment"),
       spreadFactor: Number(document.querySelector('input[name="spreadFactor"]:checked').value),
@@ -338,13 +422,27 @@
     });
   }
 
-  function finalCut(config, exam2AB = config.exam2AB) {
+  function assessments(config) {
+    return [
+      { name: "1차 정기시험", max: config.exam1Max, targets: config.exam1Targets, cuts: config.exam1Cuts },
+      { name: "2차 정기시험", max: config.exam2Max, targets: config.exam2Targets, cuts: config.exam2Cuts },
+      ...config.performanceAreas.map((area) => ({
+        name: area.name, max: area.max, targets: area.targets, cuts: area.cuts,
+      })),
+    ];
+  }
+
+  function finalCutAt(config, index, exam2Cut = config.exam2Cuts[index]) {
     const performanceCut = config.performanceAreas.reduce((sum, area) =>
-      sum + (area.ab / area.max * area.weight), 0
+      sum + (area.cuts[index] / area.max * area.weight), 0
     );
-    return (config.exam1AB / config.exam1Max * config.exam1Weight)
-      + (exam2AB / config.exam2Max * config.exam2Weight)
+    return (config.exam1Cuts[index] / config.exam1Max * config.exam1Weight)
+      + (exam2Cut / config.exam2Max * config.exam2Weight)
       + performanceCut;
+  }
+
+  function finalCut(config, exam2AB = config.exam2AB) {
+    return finalCutAt(config, 0, exam2AB);
   }
 
   function lowerBound(sorted, target) {
@@ -384,6 +482,36 @@
     };
   }
 
+  function gradeForecast(trialScores, config) {
+    const cuts = BOUNDARIES.map((_, index) => finalCutAt(config, index));
+    const total = trialScores[0]?.length || 0;
+    const ratesByGrade = GRADES.map(() => []);
+    trialScores.forEach((scores) => {
+      const below = cuts.map((cut) => lowerBound(scores, cut));
+      const counts = [
+        total - below[0],
+        below[0] - below[1],
+        below[1] - below[2],
+        below[2] - below[3],
+        below[3],
+      ];
+      counts.forEach((count, index) => ratesByGrade[index].push(total ? count / total * 100 : 0));
+    });
+    const grades = GRADES.map((grade, index) => {
+      const rates = ratesByGrade[index].sort((a, b) => a - b);
+      const median = percentile(rates, 0.5);
+      return {
+        grade,
+        median,
+        lower: percentile(rates, 0.05),
+        upper: percentile(rates, 0.95),
+        mean: rates.reduce((sum, rate) => sum + rate, 0) / rates.length,
+        medianCount: Math.round(median / 100 * total),
+      };
+    });
+    return { cuts, total, grades };
+  }
+
   function forecastStatus(result) {
     if (result.upper <= RECOMMENDATION_LIMIT) {
       return { key: "safe", label: "안정", description: "예측구간 상한도 23.9% 이하" };
@@ -411,14 +539,24 @@
     if (weights.some((value) => !Number.isFinite(value) || value < 0)) {
       return "반영비율은 0 이상이어야 합니다.";
     }
-    if (![config.exam1AB, config.exam2AB].every(Number.isFinite)) {
-      return "지필평가 A/B 분할점수를 입력해 주세요.";
+    if (!Number.isFinite(config.teacherCount)) {
+      return "담당 교사 수는 1~20명 사이의 정수로 입력해 주세요.";
     }
-    if (
-      config.exam1AB < 0 || config.exam1AB > config.exam1Max
-      || config.exam2AB < 0 || config.exam2AB > config.exam2Max
-    ) {
-      return "지필평가 A/B 분할점수는 0점 이상 각 시험 만점 이하여야 합니다.";
+    for (const item of assessments(config)) {
+      if (!item.targets.every(Number.isFinite)) {
+        return `${item.name}의 A/B·B/C·C/D·D/E 분할점수를 모두 입력해 주세요.`;
+      }
+      if (item.targets.some((target) => target < 0 || target > item.max)) {
+        return `${item.name} 분할점수는 0점 이상 만점 이하여야 합니다.`;
+      }
+      if (item.targets.some((target) =>
+        neisSet(target, config.teacherCount, { max: item.max }).teachers.some((value) => value > item.max)
+      )) {
+        return `${item.name}: 교사별 5점 단위 입력값이 만점을 넘습니다. 분할점수를 조금 낮춰 주세요.`;
+      }
+      if (item.cuts.some((cut, index) => index > 0 && item.cuts[index - 1] <= cut + 1e-9)) {
+        return `${item.name} 분할점수는 나이스 평균 기준으로 A/B > B/C > C/D > D/E 순서여야 합니다.`;
+      }
     }
     const weightSum = weights.reduce((sum, value) => sum + value, 0);
     if (Math.abs(weightSum - 100) > 1e-9) {
@@ -427,13 +565,11 @@
     if (!config.performanceAreas.length) {
       return "수행평가 영역을 하나 이상 추가해 주세요.";
     }
-    if (config.performanceAreas.some((area) => !Number.isFinite(area.ab) || !Number.isFinite(area.expected))) {
-      return "모든 수행평가 영역의 분할점수와 예상점수를 입력해 주세요.";
+    if (config.performanceAreas.some((area) => !Number.isFinite(area.expected))) {
+      return "모든 수행평가 영역의 예상점수를 입력해 주세요.";
     }
-    if (config.performanceAreas.some((area) =>
-      area.ab < 0 || area.ab > area.max || area.expected < 0 || area.expected > area.max
-    )) {
-      return "수행평가 분할점수와 예상점수는 0점 이상 각 영역 만점 이하여야 합니다.";
+    if (config.performanceAreas.some((area) => area.expected < 0 || area.expected > area.max)) {
+      return "수행평가 예상점수는 0점 이상 각 영역 만점 이하여야 합니다.";
     }
     if (!students.length) return "유효한 1차 점수 데이터가 없습니다.";
     if (students.some((student) => student.exam1 < 0 || student.exam1 > config.exam1Max)) {
@@ -527,24 +663,25 @@
     render();
   }
 
-  function simulationValues(maximum) {
+  function simulationValues(maximum, teacherCount) {
     let start = clamp(number("rangeStart"), 0, maximum);
     let end = clamp(number("rangeEnd"), 0, maximum);
     const step = number("rangeStep");
     if (![start, end, step].every(Number.isFinite) || step <= 0) return [];
     if (start > end) [start, end] = [end, start];
-    const values = [];
-    for (let value = start; value <= end + step / 1000 && values.length < 201; value += step) {
-      values.push(Number(value.toFixed(6)));
+    const values = new Map();
+    for (let value = start; value <= end + step / 1000 && values.size < 201; value += step) {
+      const cut = neisSet(value, teacherCount).value;
+      if (cut >= 0 && cut <= maximum + 1e-9) values.set(cut.toFixed(6), cut);
     }
-    return values;
+    return [...values.values()].sort((a, b) => a - b);
   }
 
   function renderTable(trialScores, config) {
     const body = $("simulationBody");
     body.innerHTML = "";
     const reportRows = [];
-    simulationValues(config.exam2Max).forEach((cut) => {
+    simulationValues(config.exam2Max, config.teacherCount).forEach((cut) => {
       const result = forecast(trialScores, config, cut);
       const level = forecastStatus(result);
       reportRows.push({
@@ -559,7 +696,7 @@
       const row = document.createElement("tr");
       if (Math.abs(cut - config.exam2AB) < 1e-9) row.className = "current";
       row.innerHTML = `
-        <td>${format(cut, Number.isInteger(cut) ? 0 : 1)}</td>
+        <td>${formatCut(cut)}</td>
         <td>${format(result.cut, 2)}</td>
         <td>${format(result.median)}%</td>
         <td>${format(result.lower)}~${format(result.upper)}%</td>
@@ -572,27 +709,105 @@
   }
 
   function renderRecommendation(trialScores, config) {
-    if (forecast(trialScores, config, config.exam2Max).upper > RECOMMENDATION_LIMIT) {
+    const count = config.teacherCount;
+    const cutAt = (units) => units * SCORE_UNIT / count;
+    const maxUnits = Math.floor(config.exam2Max * count / SCORE_UNIT + 1e-9);
+    if (forecast(trialScores, config, cutAt(maxUnits)).upper > RECOMMENDATION_LIMIT) {
       $("recommendationText").textContent =
-        "2차 A/B 컷을 만점까지 높여도 90% 예측구간 상한이 23.9%를 초과합니다.";
+        `2차 A/B 컷을 나이스에 입력할 수 있는 최댓값(${formatCut(cutAt(maxUnits))}점)까지 높여도 90% 예측구간 상한이 23.9%를 초과합니다.`;
       return;
     }
     let low = 0;
-    let high = Math.round(config.exam2Max * 10);
+    let high = maxUnits;
     while (low < high) {
       const middle = Math.floor((low + high) / 2);
-      if (forecast(trialScores, config, middle / 10).upper <= RECOMMENDATION_LIMIT) high = middle;
+      if (forecast(trialScores, config, cutAt(middle)).upper <= RECOMMENDATION_LIMIT) high = middle;
       else low = middle + 1;
     }
+    const best = cutAt(low);
     $("recommendationText").innerHTML =
-      `90% 예측구간 상한까지 23.9% 이하가 되려면 2차 A/B 분할점수는 최소 <strong>${format(low / 10, 1)}점</strong>입니다.`;
+      `90% 예측구간 상한까지 23.9% 이하가 되려면 2차 A/B 분할점수는 최소 <strong>${formatCut(best)}점</strong>입니다.`
+      + `<span class="recommendation__set">나이스 교사별 입력: ${neisSet(best, count, { max: config.exam2Max, salt: 4 }).teachers.join(" · ")}</span>`;
+  }
+
+  function renderNeisTable(config) {
+    const body = $("neisSetBody");
+    const count = config.teacherCount;
+    if (!Number.isFinite(count)) {
+      body.innerHTML = '<tr><td colspan="5">담당 교사 수(1~20명)를 입력하면 교사별 입력값을 보여줍니다.</td></tr>';
+      $("neisNote").textContent = "";
+      return [];
+    }
+    // salt: 평가 행 × 4 + 컷 위치 (2차 A/B는 4 → 추천 컷 세트와 같은 순서)
+    const rows = assessments(config).map((item, row) => ({
+      name: item.name,
+      sets: item.targets.map((target, index) =>
+        neisSet(target, count, { max: item.max, salt: row * 4 + index })
+      ),
+    }));
+    body.innerHTML = rows.map((row) => `
+      <tr>
+        <td class="neis-name">${escapeHtml(row.name)}</td>
+        ${row.sets.map((set) => {
+          if (!Number.isFinite(set.target)) return "<td>-</td>";
+          const adjusted = Math.abs(set.value - set.target) > 1e-6;
+          return `<td>
+            <strong class="neis-avg">${formatCut(set.value)}</strong>
+            <span class="teacher-chips">${set.teachers.map((value) => `<i>${value}</i>`).join("")}</span>
+            ${adjusted ? `<small class="neis-adjusted">입력 ${formatCut(set.target)} → 조정</small>` : ""}
+          </td>`;
+        }).join("")}
+      </tr>
+    `).join("");
+    $("neisNote").textContent =
+      `교사 ${count}명 기준 나이스 평균은 ${formatCut(SCORE_UNIT / count)}점 간격으로만 만들 수 있어, 예측도 이 평균값으로 계산합니다.`
+      + (count > 1 ? " 평균이 소수일 때 나이스의 표시 자리수는 학교 화면에서 확인하세요." : "");
+    return rows;
+  }
+
+  function renderFinalCuts(cuts) {
+    $("finalCutGrid").innerHTML = BOUNDARIES.map((boundary, index) => `
+      <div class="final-cut${index === 0 ? " primary" : ""}">
+        <span>${boundary.label}</span>
+        <strong>${format(cuts[index], 2)}</strong>
+      </div>
+    `).join("");
+  }
+
+  function renderGrades(gradeResult) {
+    const { grades } = gradeResult;
+    const sum = grades.reduce((total, grade) => total + grade.median, 0) || 1;
+    $("gradeBar").innerHTML = grades.map((grade) => {
+      const width = grade.median / sum * 100;
+      const label = width >= 9 ? `${grade.grade} ${format(grade.median)}%` : width >= 3 ? grade.grade : "";
+      return `<div class="grade-seg grade-${grade.grade.toLowerCase()}" style="width:${width}%" title="${grade.grade} ${format(grade.median)}%">${label}</div>`;
+    }).join("");
+    const scaleMax = Math.max(10, Math.ceil(Math.max(...grades.map((grade) => grade.upper)) / 10) * 10);
+    $("gradeCards").innerHTML = grades.map((grade) => `
+      <article class="grade-card grade-${grade.grade.toLowerCase()}">
+        <div class="grade-card__top">
+          <span class="grade-badge">${grade.grade}</span>
+          <small>${grade.medianCount.toLocaleString("ko-KR")}명</small>
+        </div>
+        <strong>${format(grade.median)}<em>%</em></strong>
+        <div class="grade-range" aria-hidden="true">
+          <b style="left:${grade.lower / scaleMax * 100}%;width:${(grade.upper - grade.lower) / scaleMax * 100}%"></b>
+          <i style="left:${grade.median / scaleMax * 100}%"></i>
+        </div>
+        <small class="range-text">90% ${format(grade.lower)}~${format(grade.upper)}%</small>
+      </article>
+    `).join("");
   }
 
   function render() {
     const config = settings();
     $("exam2ABSlider").max = config.exam2Max || 100;
+    if (Number.isFinite(config.teacherCount)) {
+      $("exam2ABSlider").step = SCORE_UNIT / config.teacherCount;
+    }
     $("sliderMaxLabel").textContent = `${config.exam2Max || 100}점`;
-    $("sliderValue").textContent = format(config.exam2AB, Number.isInteger(config.exam2AB) ? 0 : 1);
+    $("sliderValue").textContent = formatCut(config.exam2AB);
+    state.neisRows = renderNeisTable(config);
     if (!state.rows.length) {
       state.lastReport = null;
       return;
@@ -635,12 +850,14 @@
     $("statusText").textContent = level.label;
     $("statusDescription").textContent = level.description;
     $("statusText").closest(".status-card").className = `metric status-card ${level.key}`;
-    $("regularCut").textContent = format(result.cut, 2);
+    const gradeResult = gradeForecast(trialScores, config);
+    renderFinalCuts(gradeResult.cuts);
+    renderGrades(gradeResult);
     $("cutFormula").textContent =
-      `1차 ${format(config.exam1AB, 1)}/${format(config.exam1Max, 1)}×${format(config.exam1Weight, 1)} + `
-      + `2차 ${format(config.exam2AB, 1)}/${format(config.exam2Max, 1)}×${format(config.exam2Weight, 1)} + `
+      `A/B = 1차 ${formatCut(config.exam1AB)}/${format(config.exam1Max, 0)}×${format(config.exam1Weight, 1)} + `
+      + `2차 ${formatCut(config.exam2AB)}/${format(config.exam2Max, 0)}×${format(config.exam2Weight, 1)} + `
       + config.performanceAreas.map((area) =>
-        `${area.name} ${format(area.ab, 1)}/${format(area.max, 1)}×${format(area.weight, 1)}`
+        `${area.name} ${formatCut(area.ab)}/${format(area.max, 0)}×${format(area.weight, 1)}`
       ).join(" + ");
     renderRecommendation(trialScores, config);
     const simulationRows = renderTable(trialScores, config);
@@ -649,6 +866,8 @@
       result,
       level,
       target,
+      gradeResult,
+      neisRows: state.neisRows,
       simulationRows,
       recommendation: $("recommendationText").textContent.trim(),
       cutFormula: $("cutFormula").textContent,
@@ -670,7 +889,9 @@
     }
     if (!state.lastReport || !state.rows.length) return;
 
-    const { config, result, level, target, simulationRows, recommendation, cutFormula } = state.lastReport;
+    const {
+      config, result, level, target, gradeResult, neisRows, simulationRows, recommendation, cutFormula,
+    } = state.lastReport;
     const workbook = XLSX.utils.book_new();
 
     const scoreRows = [
@@ -700,6 +921,9 @@
       ["보수적 판정", level.label, level.description],
       ["학기말 예상 A/B 환산컷", result.cut, cutFormula],
       ["추천 2차 A/B 컷", recommendation],
+      ...BOUNDARIES.slice(1).map((boundary, index) => [
+        `학기말 예상 ${boundary.label} 환산컷`, gradeResult.cuts[index + 1],
+      ]),
       [],
       ["주의", "본 결과는 입력한 가정에 따른 참고용 시뮬레이션이며 확정 예측이 아닙니다."],
     ];
@@ -716,27 +940,69 @@
       ? "더 좁음"
       : config.spreadFactor === 1.2 ? "더 넓음" : "비슷함";
     const settingRows = [
-      ["구분", "영역", "만점", "반영비율", "A/B 분할점수", "예상점수"],
-      ["지필평가", "1차 정기시험", config.exam1Max, config.exam1Weight / 100, config.exam1AB, "실제 점수 파일"],
-      ["지필평가", "2차 정기시험", config.exam2Max, config.exam2Weight / 100, config.exam2AB, "모의 생성"],
+      ["구분", "영역", "만점", "반영비율", "A/B", "B/C", "C/D", "D/E", "예상점수"],
+      ["지필평가", "1차 정기시험", config.exam1Max, config.exam1Weight / 100, ...config.exam1Cuts, "실제 점수 파일"],
+      ["지필평가", "2차 정기시험", config.exam2Max, config.exam2Weight / 100, ...config.exam2Cuts, "모의 생성"],
       ...config.performanceAreas.map((area) => [
-        "수행평가", area.name, area.max, area.weight / 100, area.ab, area.expected,
+        "수행평가", area.name, area.max, area.weight / 100, ...area.cuts, area.expected,
       ]),
       [],
+      ["나이스 입력", "담당 교사 수", config.teacherCount, "명 · 분할점수는 교사별 5점 단위 입력의 나이스 평균"],
       ["2차 예상 설정", "평균 변화", config.meanAdjustment, "점"],
       ["2차 예상 설정", "점수 분포", spreadLabel, `표준편차 × ${config.spreadFactor}`],
       ["2차 예상 분포", "예상 평균", target?.mean ?? "", "점"],
       ["2차 예상 분포", "예상 표준편차", target?.sd ?? "", "점"],
     ];
     const settingSheet = XLSX.utils.aoa_to_sheet(settingRows);
-    settingSheet["!autofilter"] = { ref: `A1:F${2 + config.performanceAreas.length}` };
+    settingSheet["!autofilter"] = { ref: `A1:I${3 + config.performanceAreas.length}` };
     settingSheet["!freeze"] = { xSplit: 0, ySplit: 1 };
     for (let row = 2; row <= 3 + config.performanceAreas.length; row += 1) {
       const cell = `D${row}`;
       if (settingSheet[cell]) settingSheet[cell].z = "0.0%";
     }
-    setSheetWidths(settingSheet, [16, 22, 12, 14, 18, 18]);
+    setSheetWidths(settingSheet, [16, 22, 12, 14, 10, 10, 10, 10, 18]);
     XLSX.utils.book_append_sheet(workbook, settingSheet, "입력 설정");
+
+    const gradeRows = [
+      ["등급", "중앙 비율", "중앙 인원", "90% 하한", "90% 상한", "평균 비율"],
+      ...gradeResult.grades.map((grade) => [
+        grade.grade,
+        grade.median / 100,
+        grade.medianCount,
+        grade.lower / 100,
+        grade.upper / 100,
+        grade.mean / 100,
+      ]),
+      [],
+      ["학기말 환산컷", "점수"],
+      ...BOUNDARIES.map((boundary, index) => [boundary.label, gradeResult.cuts[index]]),
+      [],
+      ["참고", "수행평가는 모든 학생에게 같은 예상점수를 적용하므로 C~E 비율은 실제보다 작게 나올 수 있습니다."],
+    ];
+    const gradeSheet = XLSX.utils.aoa_to_sheet(gradeRows);
+    for (let row = 2; row <= 6; row += 1) {
+      ["B", "D", "E", "F"].forEach((column) => {
+        const cell = `${column}${row}`;
+        if (gradeSheet[cell]) gradeSheet[cell].z = "0.0%";
+      });
+    }
+    setSheetWidths(gradeSheet, [14, 12, 12, 12, 12, 12]);
+    XLSX.utils.book_append_sheet(workbook, gradeSheet, "등급 비율 예측");
+
+    const teacherCount = config.teacherCount;
+    const neisData = [
+      ["평가", "분할점수", "입력한 컷", "나이스 평균", ...Array.from({ length: teacherCount }, (_, index) => `교사${index + 1}`)],
+      ...neisRows.flatMap((row) => row.sets.map((set, index) => [
+        row.name, BOUNDARIES[index].label, set.target, set.value, ...set.teachers,
+      ])),
+    ];
+    const neisSheet = XLSX.utils.aoa_to_sheet(neisData);
+    neisSheet["!autofilter"] = { ref: `A1:${XLSX.utils.encode_col(3 + teacherCount)}${neisData.length}` };
+    for (let row = 2; row <= neisData.length; row += 1) {
+      if (neisSheet[`D${row}`]) neisSheet[`D${row}`].z = "0.00";
+    }
+    setSheetWidths(neisSheet, [18, 10, 12, 12, ...Array(teacherCount).fill(8)]);
+    XLSX.utils.book_append_sheet(workbook, neisSheet, "나이스 입력 세트");
 
     const simulationData = [
       ["2차 A/B", "학기말 환산컷", "중앙 A비율", "90% 하한", "90% 상한", "23.9% 초과확률", "판정"],
@@ -793,7 +1059,10 @@
       <label>영역명<input class="area-name" type="text" value="${values.name || "수행평가"}"></label>
       <label>만점<input class="area-max" type="number" min="1" value="${values.max ?? 100}"></label>
       <label>반영비율<input class="area-weight weight-input" type="number" min="0" max="100" step="0.1" value="${values.weight ?? 10}"></label>
-      <label>A/B 분할점수<input class="area-ab" type="number" min="0" value="${values.ab ?? 90}"></label>
+      <label>A/B<input class="area-ab" type="number" min="0" value="${values.ab ?? 90}"></label>
+      <label>B/C<input class="area-bc" type="number" min="0" value="${values.bc ?? 80}"></label>
+      <label>C/D<input class="area-cd" type="number" min="0" value="${values.cd ?? 70}"></label>
+      <label>D/E<input class="area-de" type="number" min="0" value="${values.de ?? 60}"></label>
       <label>예상점수<input class="area-expected" type="number" min="0" value="${values.expected ?? 100}"></label>
       <button class="remove-area-button" type="button" title="영역 삭제" aria-label="수행평가 영역 삭제">×</button>
     `;
@@ -863,11 +1132,12 @@
     .filter((id) => id !== "exam2AB")
     .forEach((id) => $(id).addEventListener("input", () => scheduleRender()));
   $("exam2Max").addEventListener("input", () => syncSimulationRange());
+  $("teacherCount").addEventListener("input", syncRangeStep);
   ["exam1Weight", "exam2Weight"].forEach((id) =>
     $(id).addEventListener("input", (event) => rebalanceWeights(event.target))
   );
   $("exam2ABSlider").addEventListener("input", () => {
-    $("exam2AB").value = $("exam2ABSlider").value;
+    $("exam2AB").value = Number(Number($("exam2ABSlider").value).toFixed(2));
     syncSimulationRange();
     render();
   });
@@ -877,5 +1147,7 @@
     scheduleRender();
   });
 
+  syncRangeStep();
   updateWeightTotal();
+  render();
 })();

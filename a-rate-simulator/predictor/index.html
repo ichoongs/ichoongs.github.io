@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="고등학교 성취평가제 학기말 A비율 시뮬레이터">
   <title>A비율 시뮬레이터</title>
-  <link rel="stylesheet" href="styles.css?v=20260615-3">
+  <link rel="stylesheet" href="styles.css?v=20261123-1">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-  <script src="app.js?v=20260615-4" defer></script>
+  <script src="app.js?v=20261123-3" defer></script>
 </head>
 <body>
   <nav class="tool-switcher" aria-label="성취평가 도구 전환">
@@ -83,20 +83,26 @@
     <section class="panel assessment-panel">
       <div class="section-heading">
         <span class="step">02</span>
-        <div><h2>평가 정보</h2><p>만점과 반영비율을 입력하세요.</p></div>
+        <div><h2>평가 정보</h2><p>만점, 반영비율, 등급별 분할점수(A/B·B/C·C/D·D/E)를 입력하세요.</p></div>
       </div>
       <div class="exam-grid">
         <div class="exam-card">
           <span>1차 정기시험</span>
           <label>만점 <div class="input-unit"><input id="exam1Max" type="number" min="1" value="100"><em>점</em></div></label>
           <label>반영비율 <div class="input-unit"><input id="exam1Weight" class="weight-input" type="number" min="0" max="100" step="0.1" value="30"><em>%</em></div></label>
-          <label>A/B 분할점수 <div class="input-unit"><input id="exam1AB" type="number" min="0" value="85"><em>점</em></div></label>
+          <label>A/B <div class="input-unit"><input id="exam1AB" type="number" min="0" value="85"><em>점</em></div></label>
+          <label>B/C <div class="input-unit"><input id="exam1BC" type="number" min="0" value="75"><em>점</em></div></label>
+          <label>C/D <div class="input-unit"><input id="exam1CD" type="number" min="0" value="65"><em>점</em></div></label>
+          <label>D/E <div class="input-unit"><input id="exam1DE" type="number" min="0" value="55"><em>점</em></div></label>
         </div>
         <div class="exam-card accent">
           <span>2차 정기시험</span>
           <label>만점 <div class="input-unit"><input id="exam2Max" type="number" min="1" value="100"><em>점</em></div></label>
           <label>반영비율 <div class="input-unit"><input id="exam2Weight" class="weight-input" type="number" min="0" max="100" step="0.1" value="30"><em>%</em></div></label>
-          <label>A/B 분할점수 <div class="input-unit"><input id="exam2AB" type="number" min="0" value="85"><em>점</em></div></label>
+          <label>A/B <div class="input-unit"><input id="exam2AB" type="number" min="0" value="85"><em>점</em></div></label>
+          <label>B/C <div class="input-unit"><input id="exam2BC" type="number" min="0" value="75"><em>점</em></div></label>
+          <label>C/D <div class="input-unit"><input id="exam2CD" type="number" min="0" value="65"><em>점</em></div></label>
+          <label>D/E <div class="input-unit"><input id="exam2DE" type="number" min="0" value="55"><em>점</em></div></label>
         </div>
       </div>
       <div class="performance-editor">
@@ -108,6 +114,20 @@
       </div>
       <p class="auto-weight-note">반영비율은 입력한 값을 우선 유지하며 나머지 영역이 자동 조정됩니다. 현재 합계 <strong id="weightTotal">100.0%</strong></p>
       <p class="validation" id="weightValidation"></p>
+
+      <div class="neis-sets">
+        <div class="subheading">
+          <div><h3>나이스 분할점수 입력 세트</h3><p>교사별로 5점 단위로 입력하면 나이스는 그 평균을 분할점수로 씁니다. 입력한 컷에 가장 가까운 평균과 교사별 입력값입니다.</p></div>
+          <label class="teacher-count">담당 교사 수 <div class="input-unit"><input id="teacherCount" type="number" min="1" max="20" step="1" value="1"><em>명</em></div></label>
+        </div>
+        <div class="table-wrap neis-table-wrap">
+          <table class="neis-table">
+            <thead><tr><th>평가</th><th>A/B</th><th>B/C</th><th>C/D</th><th>D/E</th></tr></thead>
+            <tbody id="neisSetBody"></tbody>
+          </table>
+        </div>
+        <p class="neis-note" id="neisNote"></p>
+      </div>
     </section>
 
     <section class="panel scenario-panel">
@@ -157,6 +177,7 @@
             <span>23.9% 초과확률</span>
             <span>안정·주의·위험 판정</span>
             <span>추천 2차 A/B 컷</span>
+            <span>A~E 예상 비율</span>
           </div>
           <small>위에서 파일을 선택하거나 샘플 데이터로 시작하세요.</small>
         </div>
@@ -173,14 +194,29 @@
         </div>
 
         <div class="panel cut-summary">
-          <span>학기말 예상 A/B 환산컷</span>
-          <strong id="regularCut">-</strong>
-          <small id="cutFormula"></small>
+          <div class="cut-summary__head">
+            <span>학기말 예상 환산컷</span>
+            <small id="cutFormula"></small>
+          </div>
+          <div class="final-cut-grid" id="finalCutGrid"></div>
         </div>
 
         <div class="panel recommendation" id="recommendation">
           <span class="recommendation__label">추천 컷</span>
           <p id="recommendationText"></p>
+        </div>
+
+        <div class="panel grade-panel">
+          <div class="grade-panel__head">
+            <h2>A~E 예상 등급 비율</h2>
+            <p>1,000회 모의 계산의 중앙값과 90% 예측구간입니다.</p>
+          </div>
+          <div class="grade-bar">
+            <div class="grade-bar__track" id="gradeBar"></div>
+            <div class="grade-limit" style="left: 23.9%"><span>A 권고 23.9%</span></div>
+          </div>
+          <div class="grade-cards" id="gradeCards"></div>
+          <p class="grade-note">수행평가는 모든 학생에게 같은 예상점수를 적용하므로 C~E 비율은 실제보다 작게 나올 수 있습니다.</p>
         </div>
 
         <div class="result-actions">
