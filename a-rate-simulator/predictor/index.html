@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="고등학교 성취평가제 학기말 A비율 시뮬레이터">
   <title>A비율 시뮬레이터</title>
-  <link rel="stylesheet" href="styles.css?v=20261124-2">
+  <link rel="stylesheet" href="styles.css?v=20261124-3">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <script src="rateSets.js?v=20261124-1" defer></script>
-  <script src="app.js?v=20261124-1" defer></script>
+  <script src="app.js?v=20261124-2" defer></script>
 </head>
 <body>
   <nav class="tool-switcher" aria-label="성취평가 도구 전환">
@@ -85,6 +85,11 @@
       <div class="section-heading">
         <span class="step">02</span>
         <div><h2>평가 정보</h2><p>만점, 반영비율, 이미 산출된 등급별 분할점수(A/B·B/C·C/D·D/E)를 그대로 입력하세요.</p></div>
+      </div>
+      <div class="save-bar">
+        <span class="save-bar__icon" aria-hidden="true">💾</span>
+        <p id="saveStatusText"></p>
+        <button class="clear-saved-button" id="clearSaved" type="button">저장된 입력 삭제</button>
       </div>
       <div class="exam-grid">
         <div class="exam-card">

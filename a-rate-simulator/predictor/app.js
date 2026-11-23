@@ -49,6 +49,106 @@
     }
   }
 
+  // 입력 자동 저장: 설정값만 이 브라우저에 저장하고, 학생 점수 파일은 저장하지 않는다
+  const INPUTS_KEY = "aRateSavedInputs";
+  const SAVED_FIELD_IDS = [
+    "exam1Max", "exam1Weight", "exam1AB", "exam1BC", "exam1CD", "exam1DE",
+    "exam2Max", "exam2Weight", "exam2AB", "exam2BC", "exam2CD", "exam2DE",
+    "teacherCount", "meanAdjustment",
+  ];
+  let saveTimer = null;
+
+  function loadInputs() {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(INPUTS_KEY) || "null");
+      return saved && saved.version === 1 ? saved : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function collectInputs() {
+    return {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      fields: Object.fromEntries(SAVED_FIELD_IDS.map((id) => [id, $(id).value])),
+      spreadFactor: document.querySelector('input[name="spreadFactor"]:checked')?.value,
+      groupWeights: [...document.querySelectorAll(".group-weight")].map((input) => input.value),
+      areas: [...document.querySelectorAll(".performance-area")].map((area) => ({
+        name: area.querySelector(".area-name").value,
+        max: area.querySelector(".area-max").value,
+        weight: area.querySelector(".area-weight").value,
+        ab: area.querySelector(".area-ab").value,
+        bc: area.querySelector(".area-bc").value,
+        cd: area.querySelector(".area-cd").value,
+        de: area.querySelector(".area-de").value,
+        expected: area.querySelector(".area-expected").value,
+      })),
+    };
+  }
+
+  function saveInputs() {
+    try {
+      const data = collectInputs();
+      window.localStorage.setItem(INPUTS_KEY, JSON.stringify(data));
+      renderSaveStatus(data);
+    } catch (error) {
+      renderSaveStatus(null, true);
+    }
+  }
+
+  function scheduleSave() {
+    window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(saveInputs, 400);
+  }
+
+  function restoreInputs(saved) {
+    Object.entries(saved.fields || {}).forEach(([id, value]) => {
+      if (SAVED_FIELD_IDS.includes(id) && $(id) && value !== undefined) $(id).value = value;
+    });
+    const spread = document.querySelector(`input[name="spreadFactor"][value="${saved.spreadFactor}"]`);
+    if (spread) spread.checked = true;
+    document.querySelectorAll(".group-weight").forEach((input, index) => {
+      if (saved.groupWeights?.[index] !== undefined) input.value = saved.groupWeights[index];
+    });
+    $("exam2ABSlider").value = $("exam2AB").value;
+    syncSimulationRange();
+  }
+
+  function renderSaveStatus(saved, failed = false) {
+    const text = $("saveStatusText");
+    if (failed) {
+      text.textContent = "이 브라우저에서는 입력을 저장할 수 없습니다.";
+      $("clearSaved").disabled = true;
+      return;
+    }
+    if (saved) {
+      const time = new Date(saved.savedAt).toLocaleString("ko-KR", {
+        month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
+      });
+      text.innerHTML = `<strong>자동 저장됨</strong> · ${escapeHtml(time)} · 이 브라우저에만 저장되며 점수 파일은 저장하지 않습니다.`;
+    } else {
+      text.textContent = "입력을 바꾸면 이 브라우저에 자동 저장됩니다. 점수 파일은 저장하지 않습니다.";
+    }
+    $("clearSaved").disabled = !saved && !state.teacherNames.some((name) => String(name || "").trim());
+  }
+
+  function clearSavedInputs() {
+    const confirmed = window.confirm(
+      "이 브라우저에 저장된 입력(평가 정보, 수행평가 영역, 2차 문항정보, 교사 이름 등)을 지우고 기본값으로 되돌릴까요?\n"
+      + "되돌릴 수 없으며, 지금 불러온 점수도 화면에서 사라집니다."
+    );
+    if (!confirmed) return;
+    window.clearTimeout(saveTimer);
+    try {
+      window.localStorage.removeItem(INPUTS_KEY);
+      window.localStorage.removeItem(TEACHER_NAMES_KEY);
+    } catch (error) {
+      // 저장소를 쓸 수 없으면 지울 것도 없다
+    }
+    window.location.reload();
+  }
+
   function teacherName(index) {
     return (state.teacherNames[index] || "").trim() || `교사 ${index + 1}`;
   }
@@ -1195,7 +1295,7 @@
     const area = document.createElement("div");
     area.className = "performance-area";
     area.innerHTML = `
-      <label>영역명<input class="area-name" type="text" value="${values.name || "수행평가"}"></label>
+      <label>영역명<input class="area-name" type="text" value="${escapeHtml(values.name || "수행평가")}"></label>
       <label>만점<input class="area-max" type="number" min="1" value="${values.max ?? 100}"></label>
       <label>반영비율<input class="area-weight weight-input" type="number" min="0" max="100" step="0.1" value="${values.weight ?? 10}"></label>
       <label>A/B<input class="area-ab" type="number" min="0" step="0.01" value="${values.ab ?? 90}"></label>
@@ -1238,9 +1338,27 @@
   }
 
   bindDropzone("dropzone", "fileInput", "exam1", loadExamRows, "fileStatus");
-  addPerformanceArea({ name: "수행평가 1", weight: 15 });
-  addPerformanceArea({ name: "수행평가 2", weight: 15 });
-  addPerformanceArea({ name: "수행평가 3", weight: 10 });
+  const savedInputs = loadInputs();
+  if (savedInputs?.areas?.length) {
+    savedInputs.areas.forEach((area) => addPerformanceArea(area));
+  } else {
+    addPerformanceArea({ name: "수행평가 1", weight: 15 });
+    addPerformanceArea({ name: "수행평가 2", weight: 15 });
+    addPerformanceArea({ name: "수행평가 3", weight: 10 });
+  }
+  if (savedInputs) restoreInputs(savedInputs);
+  renderSaveStatus(savedInputs);
+  // 사용자가 값을 바꾸거나 영역을 추가·삭제할 때만 저장한다 (점수 파일 선택은 제외)
+  document.addEventListener("input", (event) => {
+    if (event.target.id !== "fileInput" && !event.target.classList.contains("teacher-name")) scheduleSave();
+  });
+  document.addEventListener("change", (event) => {
+    if (event.target.name === "spreadFactor") scheduleSave();
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("#addPerformanceArea, .remove-area-button, .apply-button")) scheduleSave();
+  });
+  $("clearSaved").addEventListener("click", clearSavedInputs);
   $("addPerformanceArea").addEventListener("click", () => {
     addPerformanceArea({ name: `수행평가 ${document.querySelectorAll(".performance-area").length + 1}` });
     const addedWeight = document.querySelector(".performance-area:last-child .area-weight");
@@ -1284,6 +1402,7 @@
     if (!event.target.classList.contains("teacher-name")) return;
     state.teacherNames[Number(event.target.dataset.index)] = event.target.value;
     saveTeacherNames();
+    renderSaveStatus(loadInputs());
   });
   $("teacherCards").addEventListener("click", async (event) => {
     const button = event.target.closest(".copy-button");
