@@ -137,20 +137,26 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0 0; }
 .neis-sets .subheading p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
 .teacher-count { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .teacher-count .input-unit { width: 88px; margin-top: 0; }
-.neis-table-wrap { max-height: none; border: 1px solid var(--line); border-radius: 6px; background: white; }
-.neis-table th { position: static; }
-.neis-table td { vertical-align: top; }
-.neis-table th:first-child, .neis-table td.neis-name { text-align: left; padding-left: 12px; }
-.neis-table td.neis-name { color: var(--teal-dark); font-weight: 850; vertical-align: middle; }
-.neis-avg { display: block; color: var(--teal-dark); font-size: 16px; font-weight: 850; }
-.teacher-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin-top: 4px; }
-.teacher-chips i { min-width: 28px; padding: 2px 5px; border-radius: 4px; background: var(--mint); color: var(--teal-dark); font-size: 11px; font-style: normal; font-weight: 800; }
-.neis-adjusted { display: block; margin-top: 4px; color: #a67417; font-size: 11px; font-weight: 700; }
+.item-groups { display: grid; grid-template-columns: auto 1fr 1fr; align-items: end; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: white; }
+.item-groups__title { align-self: center; color: var(--teal-dark); font-size: 13px; }
+.item-group { display: flex; align-items: flex-end; gap: 8px; }
+.item-group > span { padding-bottom: 10px; color: #385156; font-size: 12px; font-weight: 850; white-space: nowrap; }
+.item-group__inputs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; flex: 1; }
+.item-group__inputs label { font-size: 11px; color: var(--muted); }
+.item-group__inputs input { display: block; height: 34px; margin-top: 3px; text-align: right; }
+.item-groups__total { grid-column: 1 / -1; color: var(--muted); font-size: 12px; font-weight: 700; }
+.item-groups__total.error { color: var(--red); }
+.rate-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+.rate-target { padding: 8px 10px; border-radius: 6px; background: var(--mint); text-align: center; }
+.rate-target span { display: block; color: var(--teal-dark); font-size: 11px; font-weight: 850; }
+.rate-target strong { display: block; color: var(--teal-dark); font-size: 19px; font-weight: 850; }
+.rate-target small { color: var(--muted); font-size: 11px; }
+.rate-summary__empty { grid-column: 1 / -1; margin: 0; padding: 10px 12px; border-radius: 6px; background: #fbe9e7; color: #9c3533; font-size: 12px; font-weight: 700; }
 .neis-note { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
 .teacher-cards-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .teacher-cards-head strong { color: var(--ink); font-size: 14px; }
 .teacher-cards-head span { color: var(--muted); font-size: 12px; }
-.teacher-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 10px; margin-top: 10px; }
+.teacher-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; margin-top: 10px; }
 .teacher-card { border: 1px solid var(--line); border-top: 3px solid var(--teal); border-radius: 8px; background: white; overflow: hidden; }
 .teacher-card__head { display: flex; align-items: center; gap: 8px; padding: 9px 10px; }
 .teacher-card__head .teacher-no { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--mint); color: var(--teal); font-size: 12px; font-weight: 900; }
@@ -159,9 +165,17 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0 0; }
 .copy-button:hover { background: #edf8f4; }
 .copy-button.copied { background: var(--teal); color: white; }
 .teacher-table { font-size: 12px; }
+.teacher-table th, .teacher-table td { white-space: nowrap; }
 .teacher-table th { position: static; padding: 6px 5px; }
 .teacher-table td { padding: 6px 5px; font-weight: 800; color: var(--teal-dark); }
-.teacher-table th:first-child, .teacher-table td:first-child { padding-left: 10px; text-align: left; color: #385156; font-weight: 700; }
+.teacher-table td { color: #385156; font-weight: 700; }
+.teacher-table td.rate-cell { color: var(--teal-dark); font-weight: 850; }
+.teacher-table td.type-cell { background: #f6f9f8; font-weight: 850; }
+.teacher-table tfoot td { border-top: 1px solid var(--line); background: #f3faf7; color: var(--teal); font-weight: 850; }
+.cut-achieved { display: block; min-height: 15px; margin-top: 3px; color: var(--teal); font-size: 11px; font-weight: 800; }
+.slider-achieved { margin-top: 2px; color: var(--teal-dark) !important; }
+.apply-button { margin-left: 4px; border: 1px solid #d4aa55; border-radius: 5px; background: white; color: #946716; padding: 3px 8px; font-size: 11px; font-weight: 850; }
+.apply-button:hover { background: #fff3d6; }
 .method-list { display: grid; gap: 6px; }
 .method { border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px; display: flex; align-items: center; gap: 9px; cursor: pointer; }
 .method.active { border-color: var(--teal); background: #f3faf7; box-shadow: inset 3px 0 var(--teal); }
@@ -302,6 +316,7 @@ footer p { margin: 0; }
   .exam-card { grid-template-columns: repeat(3, 1fr); }
   .exam-card > span { grid-column: 1 / -1; }
   .exam-card__note { grid-column: 1 / -1; }
+  .item-groups { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
   .tool-switcher { align-items: stretch; flex-direction: column; gap: 5px; padding: 9px 12px; }
@@ -330,6 +345,9 @@ footer p { margin: 0; }
   .final-cut-grid, .exam2-cuts { grid-template-columns: 1fr 1fr; }
   .grade-cards { grid-template-columns: repeat(3, 1fr); }
   .neis-sets .subheading { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .rate-summary { grid-template-columns: 1fr 1fr; }
+  .item-group { flex-direction: column; align-items: stretch; }
+  .item-group > span { padding-bottom: 0; }
   .neis-guide ol { display: block; }
   .neis-guide li { margin-top: 5px; }
   .neis-guide li:not(:last-child)::after { content: "↓"; }
