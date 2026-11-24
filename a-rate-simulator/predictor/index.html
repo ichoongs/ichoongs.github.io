@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="고등학교 성취평가제 학기말 A비율 시뮬레이터">
   <title>A비율 시뮬레이터</title>
-  <link rel="stylesheet" href="styles.css?v=20261124-3">
+  <link rel="stylesheet" href="styles.css?v=20261124-5">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <script src="rateSets.js?v=20261124-1" defer></script>
-  <script src="app.js?v=20261124-2" defer></script>
+  <script src="app.js?v=20261124-4" defer></script>
 </head>
 <body>
   <nav class="tool-switcher" aria-label="성취평가 도구 전환">
@@ -153,6 +153,7 @@
       </div>
     </section>
 
+    <aside class="control-column" aria-label="2차 예상 조작판">
     <section class="panel scenario-panel">
       <div class="section-heading">
         <span class="step">03</span>
@@ -179,7 +180,6 @@
       </div>
     </section>
 
-    <section class="results-column">
       <div class="panel control-panel">
         <div class="section-heading">
           <span class="step">04</span>
@@ -195,7 +195,9 @@
           <label>D/E 목표 <div class="input-unit"><input id="exam2DE" type="number" min="0" step="0.1" value="55"><em>점</em></div><small class="cut-achieved" id="exam2DEAvg"></small></label>
         </div>
       </div>
+    </aside>
 
+    <section class="results-column">
       <div class="result-state empty" id="emptyState">
         <div class="empty-preview">
           <strong>1차 지필 점수를 불러오면</strong>
@@ -213,6 +215,30 @@
       </div>
 
       <div id="results" hidden>
+        <div class="panel grade-panel exam2-grade-panel">
+          <div class="grade-panel__head">
+            <h2>2차 지필 예상 등급 비율</h2>
+            <p>2차 점수만 위 나이스 산출 분할점수로 나눈 비율입니다. 1,000회 모의 계산의 중앙값과 90% 예측구간이며, 1차 실제 비율과 비교합니다.</p>
+          </div>
+          <div class="compare-bars">
+            <div class="compare-row">
+              <span class="compare-row__label">2차 예상</span>
+              <div class="grade-bar__track" id="exam2GradeBar"></div>
+            </div>
+            <small class="compare-row__cuts" id="exam2CutText"></small>
+            <div class="compare-row">
+              <span class="compare-row__label">1차 실제</span>
+              <div class="grade-bar__track compare-row__track--muted" id="exam1GradeBar"></div>
+            </div>
+            <small class="compare-row__cuts" id="exam1CutText"></small>
+          </div>
+          <div class="grade-cards" id="exam2GradeCards"></div>
+          <div class="histogram">
+            <div class="histogram__head"><strong>2차 예상 점수 분포</strong><small>막대 높이 = 점수 구간별 평균 인원(5% 구간), 선 = 2차 분할점수</small></div>
+            <div id="exam2Histogram"></div>
+          </div>
+        </div>
+
         <div class="metric-grid">
           <article class="metric"><span>전체 학생</span><strong id="totalStudents">-</strong><small>명</small></article>
           <article class="metric"><span>중앙 예상 A 인원</span><strong id="aCount">-</strong><small>명</small></article>
@@ -237,7 +263,7 @@
 
         <div class="panel grade-panel">
           <div class="grade-panel__head">
-            <h2>A~E 예상 등급 비율</h2>
+            <h2>학기말 최종 A~E 예상 등급 비율</h2>
             <p>1,000회 모의 계산의 중앙값과 90% 예측구간입니다.</p>
           </div>
           <div class="grade-bar">

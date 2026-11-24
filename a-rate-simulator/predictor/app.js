@@ -49,7 +49,7 @@
     }
   }
 
-  // 입력 자동 저장: 설정값만 이 브라우저에 저장하고, 학생 점수 파일은 저장하지 않는다
+  // 입력 자동 저장: 설정값을 이 브라우저에 저장한다 (1차 점수는 SCORES_KEY에 점수만 따로 저장)
   const INPUTS_KEY = "aRateSavedInputs";
   const SAVED_FIELD_IDS = [
     "exam1Max", "exam1Weight", "exam1AB", "exam1BC", "exam1CD", "exam1DE",
@@ -126,23 +126,25 @@
       const time = new Date(saved.savedAt).toLocaleString("ko-KR", {
         month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
       });
-      text.innerHTML = `<strong>자동 저장됨</strong> · ${escapeHtml(time)} · 이 브라우저에만 저장되며 점수 파일은 저장하지 않습니다.`;
+      text.innerHTML = `<strong>자동 저장됨</strong> · ${escapeHtml(time)} · 이 브라우저에만 저장되며, 1차 점수는 학번 없이 점수만 저장합니다.`;
     } else {
-      text.textContent = "입력을 바꾸면 이 브라우저에 자동 저장됩니다. 점수 파일은 저장하지 않습니다.";
+      text.textContent = "입력을 바꾸면 이 브라우저에 자동 저장됩니다. 1차 점수는 학번 없이 점수만 저장합니다.";
     }
-    $("clearSaved").disabled = !saved && !state.teacherNames.some((name) => String(name || "").trim());
+    $("clearSaved").disabled = !saved && !loadSavedScores()
+      && !state.teacherNames.some((name) => String(name || "").trim());
   }
 
   function clearSavedInputs() {
     const confirmed = window.confirm(
-      "이 브라우저에 저장된 입력(평가 정보, 수행평가 영역, 2차 문항정보, 교사 이름 등)을 지우고 기본값으로 되돌릴까요?\n"
-      + "되돌릴 수 없으며, 지금 불러온 점수도 화면에서 사라집니다."
+      "이 브라우저에 저장된 입력(평가 정보, 수행평가 영역, 2차 문항정보, 교사 이름)과 저장된 1차 점수를 지우고 기본값으로 되돌릴까요?\n"
+      + "되돌릴 수 없으며, 점수를 다시 쓰려면 나이스 파일을 다시 올려야 합니다."
     );
     if (!confirmed) return;
     window.clearTimeout(saveTimer);
     try {
       window.localStorage.removeItem(INPUTS_KEY);
       window.localStorage.removeItem(TEACHER_NAMES_KEY);
+      window.localStorage.removeItem(SCORES_KEY);
     } catch (error) {
       // 저장소를 쓸 수 없으면 지울 것도 없다
     }
@@ -405,7 +407,43 @@
     element.classList.toggle("error", error);
   }
 
-  function loadExamRows(rows, fileName, formatLabel = "행 단위 명단형") {
+  // 불러온 1차 점수 저장: 학번 없이 점수 숫자만 크기순으로 저장한다 (샘플 데이터는 저장하지 않음)
+  const SCORES_KEY = "aRateSavedScores";
+
+  function loadSavedScores() {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(SCORES_KEY) || "null");
+      if (!saved || saved.version !== 1 || !Array.isArray(saved.scores)) return null;
+      const scores = saved.scores.map(Number).filter(Number.isFinite);
+      return scores.length ? { ...saved, scores } : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function saveScores(fileName) {
+    try {
+      window.localStorage.setItem(SCORES_KEY, JSON.stringify({
+        version: 1,
+        savedAt: new Date().toISOString(),
+        fileName,
+        scores: state.rows.map((row) => row.exam1).sort((a, b) => a - b),
+      }));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function restoreSavedScores(saved) {
+    const rows = saved.scores.map((exam1, index) => ({ studentId: String(index + 1), exam1 }));
+    const time = new Date(saved.savedAt).toLocaleString("ko-KR", {
+      month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
+    });
+    loadExamRows(rows, saved.fileName || "저장된 점수", `저장된 점수 사용 중(${time} 저장, 학번 없이 점수만)`, false);
+  }
+
+  function loadExamRows(rows, fileName, formatLabel = "행 단위 명단형", persist = true) {
     if (!rows.length) throw new Error("학생 데이터가 없습니다.");
     state.columns = Object.keys(rows[0]);
     const idColumn = findColumn(
@@ -433,7 +471,11 @@
     $("exam1Count").textContent = state.rows.length.toLocaleString("ko-KR");
     $("exam1Mean").textContent = format(stats.mean, 1);
     $("exam1Sd").textContent = format(stats.sd, 1);
-    showStatus("fileStatus", `${fileName} · ${formatLabel} · ${state.rows.length.toLocaleString("ko-KR")}명 자동 분석 완료`);
+    const savedNote = persist
+      ? (saveScores(fileName) ? " · 점수만 이 브라우저에 저장됨" : " · 점수 저장 실패")
+      : "";
+    showStatus("fileStatus", `${fileName} · ${formatLabel} · ${state.rows.length.toLocaleString("ko-KR")}명 자동 분석 완료${savedNote}`);
+    if (persist) renderSaveStatus(loadInputs());
     render();
   }
 
@@ -544,7 +586,8 @@
       (student.exam1 / config.exam1Max * config.exam1Weight)
       + performanceScore
     );
-    return Array.from({ length: SIMULATION_COUNT }, () => {
+    const exam2Trials = [];
+    const totals = Array.from({ length: SIMULATION_COUNT }, () => {
       const latentScores = students.map((student) => {
         const zScore = distribution.exam1Sd > 0
           ? (student.exam1 - distribution.exam1Mean) / distribution.exam1Sd
@@ -553,15 +596,18 @@
       });
       const latentMean = latentScores.reduce((sum, value) => sum + value, 0) / latentScores.length;
       const latentSd = standardDeviation(latentScores, latentMean) || 1;
-      return latentScores.map((latentScore, index) => {
-        const exam2 = clamp(
-          distribution.mean + distribution.sd * ((latentScore - latentMean) / latentSd),
-          0,
-          config.exam2Max
-        );
-        return fixedScores[index] + (exam2 / config.exam2Max * config.exam2Weight);
-      }).sort((a, b) => a - b);
+      const exam2Scores = latentScores.map((latentScore) => clamp(
+        distribution.mean + distribution.sd * ((latentScore - latentMean) / latentSd),
+        0,
+        config.exam2Max
+      ));
+      exam2Trials.push([...exam2Scores].sort((a, b) => a - b));
+      return exam2Scores.map((exam2, index) =>
+        fixedScores[index] + (exam2 / config.exam2Max * config.exam2Weight)
+      ).sort((a, b) => a - b);
     });
+    // totals: 학기말 환산점수, exam2: 2차 지필 원점수 (모의 계산마다 오름차순)
+    return { totals, exam2: exam2Trials };
   }
 
   function assessments(config) {
@@ -625,7 +671,11 @@
   }
 
   function gradeForecast(trialScores, config) {
-    const cuts = BOUNDARIES.map((_, index) => finalCutAt(config, index));
+    return gradeRates(trialScores, BOUNDARIES.map((_, index) => finalCutAt(config, index)));
+  }
+
+  // 정렬된 점수 묶음(모의 계산별)과 분할점수 4개로 A~E 비율의 중앙값·90% 구간을 구한다
+  function gradeRates(trialScores, cuts) {
     const total = trialScores[0]?.length || 0;
     const ratesByGrade = GRADES.map(() => []);
     trialScores.forEach((scores) => {
@@ -972,16 +1022,21 @@
     `).join("");
   }
 
-  function renderGrades(gradeResult) {
-    const { grades } = gradeResult;
+  function gradeBarHtml(grades) {
     const sum = grades.reduce((total, grade) => total + grade.median, 0) || 1;
-    $("gradeBar").innerHTML = grades.map((grade) => {
+    return grades.map((grade) => {
       const width = grade.median / sum * 100;
       const label = width >= 9 ? `${grade.grade} ${format(grade.median)}%` : width >= 3 ? grade.grade : "";
       return `<div class="grade-seg grade-${grade.grade.toLowerCase()}" style="width:${width}%" title="${grade.grade} ${format(grade.median)}%">${label}</div>`;
     }).join("");
+  }
+
+  // compare: 같은 순서의 비교용 등급 배열(예: 1차 실제 비율), 카드 아래에 함께 표시
+  function renderGrades(gradeResult, barId = "gradeBar", cardsId = "gradeCards", compare = null) {
+    const { grades } = gradeResult;
+    $(barId).innerHTML = gradeBarHtml(grades);
     const scaleMax = Math.max(10, Math.ceil(Math.max(...grades.map((grade) => grade.upper)) / 10) * 10);
-    $("gradeCards").innerHTML = grades.map((grade) => `
+    $(cardsId).innerHTML = grades.map((grade, index) => `
       <article class="grade-card grade-${grade.grade.toLowerCase()}">
         <div class="grade-card__top">
           <span class="grade-badge">${grade.grade}</span>
@@ -993,8 +1048,49 @@
           <i style="left:${grade.median / scaleMax * 100}%"></i>
         </div>
         <small class="range-text">90% ${format(grade.lower)}~${format(grade.upper)}%</small>
+        ${compare ? `<small class="grade-compare">1차 ${format(compare[index].median)}%</small>` : ""}
       </article>
     `).join("");
+  }
+
+  function renderExam2Grades(exam2Result, exam1Result, exam2Trials, config) {
+    renderGrades(exam2Result, "exam2GradeBar", "exam2GradeCards", exam1Result.grades);
+    $("exam1GradeBar").innerHTML = gradeBarHtml(exam1Result.grades);
+    $("exam2CutText").textContent =
+      `2차 ${BOUNDARIES.map((boundary, index) => `${boundary.label} ${formatCut(exam2Result.cuts[index])}`).join(" · ")}`;
+    $("exam1CutText").textContent =
+      `1차 ${BOUNDARIES.map((boundary, index) => `${boundary.label} ${formatCut(exam1Result.cuts[index])}`).join(" · ")}`;
+    renderExam2Histogram(exam2Trials, config);
+  }
+
+  // 2차 예상 점수 분포: 만점을 20구간으로 나눠 모의 계산 평균 인원을 막대로, 분할점수를 선으로 표시
+  function renderExam2Histogram(exam2Trials, config) {
+    const BINS = 20;
+    const max = config.exam2Max;
+    const width = max / BINS;
+    const counts = Array(BINS).fill(0);
+    exam2Trials.forEach((scores) => scores.forEach((score) => {
+      counts[Math.min(BINS - 1, Math.floor(score / width))] += 1;
+    }));
+    const averages = counts.map((count) => count / exam2Trials.length);
+    const peak = Math.max(...averages) || 1;
+    const cuts = config.exam2Cuts;
+    const gradeAt = (score) => GRADES[cuts.findIndex((cut) => score >= cut - 1e-9)] || GRADES[GRADES.length - 1];
+    $("exam2Histogram").innerHTML = `
+      <div class="histogram__bars">
+        ${averages.map((average, index) => {
+          const from = index * width;
+          const grade = gradeAt(from + width / 2);
+          return `<div class="histogram__bar grade-${grade.toLowerCase()}" style="height:${average / peak * 100}%"
+            title="${formatCut(from)}~${formatCut(from + width)}점 · 평균 ${format(average, 1)}명"></div>`;
+        }).join("")}
+        ${cuts.map((cut, index) => `
+          <div class="histogram__cut" style="left:${clamp(cut / max * 100, 0, 100)}%">
+            <span style="top:${index % 2 ? -28 : -16}px">${BOUNDARIES[index].label} ${formatCut(cut)}</span>
+          </div>`).join("")}
+      </div>
+      <div class="histogram__axis"><span>0점</span><span>${formatCut(max / 2)}점</span><span>${formatCut(max)}점</span></div>
+    `;
   }
 
   function render() {
@@ -1041,7 +1137,12 @@
     $("emptyState").textContent = "";
     $("emptyState").hidden = true;
     $("results").hidden = false;
-    const trialScores = buildTrialScores(students, config);
+    const { totals: trialScores, exam2: exam2Trials } = buildTrialScores(students, config);
+    const exam2Result = gradeRates(exam2Trials, config.exam2Cuts);
+    const exam1Result = gradeRates(
+      [students.map((student) => student.exam1).sort((a, b) => a - b)], config.exam1Cuts
+    );
+    renderExam2Grades(exam2Result, exam1Result, exam2Trials, config);
     const result = forecast(trialScores, config);
     const level = forecastStatus(result);
 
@@ -1070,6 +1171,8 @@
       level,
       target,
       gradeResult,
+      exam2Result,
+      exam1Result,
       rateResult: state.rateResult,
       simulationRows,
       recommendation: $("recommendationText").textContent.trim(),
@@ -1093,7 +1196,8 @@
     if (!state.lastReport || !state.rows.length) return;
 
     const {
-      config, result, level, target, gradeResult, rateResult, simulationRows, recommendation, cutFormula,
+      config, result, level, target, gradeResult, exam2Result, exam1Result,
+      rateResult, simulationRows, recommendation, cutFormula,
     } = state.lastReport;
     const workbook = XLSX.utils.book_new();
 
@@ -1196,6 +1300,33 @@
     setSheetWidths(gradeSheet, [14, 12, 12, 12, 12, 12]);
     XLSX.utils.book_append_sheet(workbook, gradeSheet, "등급 비율 예측");
 
+    const exam2GradeRows = [
+      ["등급", "2차 중앙 비율", "2차 중앙 인원", "2차 90% 하한", "2차 90% 상한", "1차 실제 비율", "1차 실제 인원"],
+      ...exam2Result.grades.map((grade, index) => [
+        grade.grade,
+        grade.median / 100,
+        grade.medianCount,
+        grade.lower / 100,
+        grade.upper / 100,
+        exam1Result.grades[index].median / 100,
+        exam1Result.grades[index].medianCount,
+      ]),
+      [],
+      ["분할점수", "2차(나이스 평균)", "1차"],
+      ...BOUNDARIES.map((boundary, index) => [boundary.label, exam2Result.cuts[index], exam1Result.cuts[index]]),
+      [],
+      ["참고", "2차 점수만 2차 분할점수로 나눈 비율입니다. 2차 점수는 1차 성취 경향을 약 80% 유지한 1,000회 모의 계산입니다."],
+    ];
+    const exam2GradeSheet = XLSX.utils.aoa_to_sheet(exam2GradeRows);
+    for (let row = 2; row <= 6; row += 1) {
+      ["B", "D", "E", "F"].forEach((column) => {
+        const cell = `${column}${row}`;
+        if (exam2GradeSheet[cell]) exam2GradeSheet[cell].z = "0.0%";
+      });
+    }
+    setSheetWidths(exam2GradeSheet, [12, 16, 14, 14, 14, 14, 14]);
+    XLSX.utils.book_append_sheet(workbook, exam2GradeSheet, "2차 단독 등급 비율");
+
     const teacherCount = config.teacherCount;
     const rateSummary = [
       ["2차 분할점수", "목표", "나이스 평균", ...Array.from({ length: teacherCount }, (_, index) => teacherName(index))],
@@ -1288,7 +1419,7 @@
         exam1: clamp(Math.round(70 + wave + trend * 0.55), 24, 100),
       };
     });
-    loadExamRows(rows, "sample_exam1.csv");
+    loadExamRows(rows, "sample_exam1.csv", "행 단위 명단형", false);
   }
 
   function addPerformanceArea(values = {}) {
@@ -1431,4 +1562,6 @@
 
   updateWeightTotal();
   render();
+  const savedScores = loadSavedScores();
+  if (savedScores) restoreSavedScores(savedScores);
 })();
