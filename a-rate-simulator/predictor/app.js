@@ -1022,19 +1022,67 @@
     `).join("");
   }
 
+  const BAR_LABEL_MIN = 9; // 막대 안에 "A 22.7%"가 들어가는 최소 폭(%)
+
   function gradeBarHtml(grades) {
     const sum = grades.reduce((total, grade) => total + grade.median, 0) || 1;
     return grades.map((grade) => {
       const width = grade.median / sum * 100;
-      const label = width >= 9 ? `${grade.grade} ${format(grade.median)}%` : width >= 3 ? grade.grade : "";
+      const label = width >= BAR_LABEL_MIN ? `${grade.grade} ${format(grade.median)}%` : "";
       return `<div class="grade-seg grade-${grade.grade.toLowerCase()}" style="width:${width}%" title="${grade.grade} ${format(grade.median)}%">${label}</div>`;
     }).join("");
+  }
+
+  // 막대 안에 글자가 안 들어가는 좁은 구간(0% 포함)은 막대 바로 아래, 그 구간 위치에 비율을 단다
+  function gradeCalloutsHtml(grades) {
+    const sum = grades.reduce((total, grade) => total + grade.median, 0) || 1;
+    let start = 0;
+    const callouts = grades.flatMap((grade) => {
+      const width = grade.median / sum * 100;
+      const center = start + width / 2;
+      start += width;
+      return width >= BAR_LABEL_MIN ? [] : [{ grade, center }];
+    });
+    if (!callouts.length) return "";
+    return `<div class="grade-callouts">${callouts.map(({ grade, center }) => `
+      <span class="grade-callout grade-${grade.grade.toLowerCase()}" data-center="${center}">
+        <i></i>${grade.grade} ${format(grade.median)}%
+      </span>`).join("")}</div>`;
+  }
+
+  // 라벨을 자기 구간 가운데에 두되, 겹치면 한 줄 안에서 옆으로 밀어 나란히 놓는다
+  function layoutCallouts(slot) {
+    const box = slot.querySelector(".grade-callouts");
+    if (!box) return;
+    const width = box.clientWidth;
+    if (!width) return;
+    const GAP = 10;
+    const items = [...box.children].map((span) => {
+      const size = span.offsetWidth;
+      const want = Number(span.dataset.center) / 100 * width - size / 2;
+      return { span, size, x: clamp(want, 0, Math.max(0, width - size)) };
+    });
+    for (let index = 1; index < items.length; index += 1) {
+      items[index].x = Math.max(items[index].x, items[index - 1].x + items[index - 1].size + GAP);
+    }
+    for (let index = items.length - 1; index >= 0; index -= 1) {
+      const limit = index === items.length - 1 ? width - items[index].size : items[index + 1].x - items[index].size - GAP;
+      items[index].x = Math.max(0, Math.min(items[index].x, limit));
+    }
+    items.forEach(({ span, x }) => { span.style.left = `${x}px`; });
+  }
+
+  function renderGradeBar(barId, grades) {
+    $(barId).innerHTML = gradeBarHtml(grades);
+    const slot = $(`${barId}Callouts`);
+    slot.innerHTML = gradeCalloutsHtml(grades);
+    layoutCallouts(slot);
   }
 
   // compare: 같은 순서의 비교용 등급 배열(예: 1차 실제 비율), 카드 아래에 함께 표시
   function renderGrades(gradeResult, barId = "gradeBar", cardsId = "gradeCards", compare = null) {
     const { grades } = gradeResult;
-    $(barId).innerHTML = gradeBarHtml(grades);
+    renderGradeBar(barId, grades);
     const scaleMax = Math.max(10, Math.ceil(Math.max(...grades.map((grade) => grade.upper)) / 10) * 10);
     $(cardsId).innerHTML = grades.map((grade, index) => `
       <article class="grade-card grade-${grade.grade.toLowerCase()}">
@@ -1055,7 +1103,7 @@
 
   function renderExam2Grades(exam2Result, exam1Result, exam2Trials, config) {
     renderGrades(exam2Result, "exam2GradeBar", "exam2GradeCards", exam1Result.grades);
-    $("exam1GradeBar").innerHTML = gradeBarHtml(exam1Result.grades);
+    renderGradeBar("exam1GradeBar", exam1Result.grades);
     $("exam2CutText").textContent =
       `2차 ${BOUNDARIES.map((boundary, index) => `${boundary.label} ${formatCut(exam2Result.cuts[index])}`).join(" · ")}`;
     $("exam1CutText").textContent =
@@ -1490,6 +1538,7 @@
     if (event.target.closest("#addPerformanceArea, .remove-area-button, .apply-button")) scheduleSave();
   });
   $("clearSaved").addEventListener("click", clearSavedInputs);
+  window.addEventListener("resize", () => document.querySelectorAll(".callout-slot").forEach(layoutCallouts));
   $("addPerformanceArea").addEventListener("click", () => {
     addPerformanceArea({ name: `수행평가 ${document.querySelectorAll(".performance-area").length + 1}` });
     const addedWeight = document.querySelector(".performance-area:last-child .area-weight");

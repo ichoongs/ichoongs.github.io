@@ -282,6 +282,12 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0 0; }
 .grade-card .range-text { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; }
 .grade-note { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
 .exam2-grade-panel { margin: 0 0 12px; }
+.compare-row__bar { min-width: 0; }
+.callout-slot--final { margin: 0 0 14px; }
+.callout-slot:empty { display: none; }
+.grade-callouts { position: relative; height: 18px; margin-top: 4px; }
+.grade-callout { position: absolute; top: 0; left: 0; display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-size: 11px; font-weight: 800; line-height: 16px; white-space: nowrap; }
+.grade-callout i { width: 8px; height: 8px; border-radius: 2px; background: var(--grade); }
 .compare-bars { display: grid; gap: 4px; margin: 14px 0 16px; }
 .compare-row { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 10px; }
 .compare-row__label { color: var(--muted); font-size: 12px; font-weight: 800; }
