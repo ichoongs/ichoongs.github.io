@@ -107,6 +107,14 @@ test('deleting the currently open ended session clears autosave and cannot resur
   await confirmDelete(h,s.sessionId);assert.equal(h.library.size,0);assert.equal(h.state().status,'ready');assert.equal(h.state().turns.length,0);assert.equal(h.state().history.length,0);assert.notEqual(h.state().sessionId,s.sessionId);
   assert.deepEqual(h.state().students,s.students);const restored=harness(h.values.get(KEY));assert.equal(restored.element('record-count').textContent,0);
 });
+test('setup and live seating both swap groups, persist after refresh and retain individual students',()=>{
+  const s=fixture(),h=harness(wrapped(s));h.element('tools-swap-seats').onclick();
+  assert.equal(h.state().leftSide,'반대');assert.equal(h.element('left-side-label').textContent,'반대');assert.equal(h.element('right-side-label').textContent,'찬성');
+  assert.ok(h.element('left-seats').innerHTML.includes('>D</span>'));assert.ok(h.element('right-seats').innerHTML.includes('>A</span>'));
+  assert.equal(h.element('left-roster-title').textContent,'반대 · 왼쪽 좌석');assert.equal(h.element('left-add-student').dataset.addSide,'반대');
+  const restored=harness(h.values.get(KEY));assert.equal(restored.element('left-side-label').textContent,'반대');assert.equal(restored.element('current-speaker').textContent,'A');
+  restored.element('swap-seats').onclick();assert.equal(restored.state().leftSide,'찬성');
+});
 test('failed current-session reset or archive delete retains the archive and reports the error',async()=>{
   for(const failure of ['storage','indexedDB']){
     const s=D.apply(fixture(),{type:'end'}),current=failure==='storage'?s:fixture(),h=harness(wrapped(current),[entry(s)]);

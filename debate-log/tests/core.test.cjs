@@ -106,3 +106,16 @@ test('moderator speech has its own continuous interval, observations, editing an
   const edit={type:'edit',turnId:s.turns[3].id,speakerId:null,kind:'moderator',atMs:13000,phase:'입론',tags:[],memos:[],newMemo:''};
   s=D.apply(s,edit,START+16000);assert.equal(D.current(s).kind,'moderator');s=D.apply(s,{type:'undo'});assert.equal(D.current(s).kind,'student');
 });
+test('seat swapping changes only presentation and preserves speaker identity, timing and exported records',()=>{
+  let s=speak(started(),0,1000);s=D.apply(s,{type:'tag',value:'개념 구분'},START+2000);const before=D.clone(s);
+  s=D.apply(s,{type:'swapSeats'},START+3000);assert.deepEqual(D.seatSides(s),['반대','찬성']);
+  assert.deepEqual(s.students,before.students);assert.deepEqual(s.turns,before.turns);assert.deepEqual(s.observations,before.observations);assert.equal(s.startedAt,before.startedAt);assert.equal(D.current(s).speakerId,before.students[0].id);
+  assert.equal(D.csv(s,START+4000),D.csv(before,START+4000));assert.equal(JSON.parse(D.json(s)).leftSide,'반대');
+  assert.equal(D.validate(JSON.parse(JSON.stringify(s))).leftSide,'반대');
+  s=D.apply(s,{type:'undo'});assert.deepEqual(D.seatSides(s),['찬성','반대']);
+  s=D.apply(D.apply(s,{type:'swapSeats'}),{type:'swapSeats'});assert.equal(s.leftSide,'찬성');
+});
+test('older backups default to the original seating arrangement and invalid seating is rejected',()=>{
+  const old=D.fresh();delete old.leftSide;assert.equal(D.validate(old).leftSide,'찬성');
+  assert.throws(()=>D.validate({...old,leftSide:'원탁'}),/좌석 배치/);
+});

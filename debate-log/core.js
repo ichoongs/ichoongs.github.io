@@ -9,7 +9,7 @@
   const id = () => Date.now().toString(36) + '-' + (++sequence).toString(36) + '-' + Math.random().toString(36).slice(2, 8);
   const clone = value => JSON.parse(JSON.stringify(value));
   function fresh() {
-    return { schemaVersion: 1, sessionId: id(), revision: 0, topic: '빅데이터 알고리즘의 편향성 — 수학은 과연 거짓말을 하지 않을까?', students: ['A','B','C','D','E','F'].map((name, i) => ({ id: id(), name, side: i < 3 ? '찬성' : '반대' })), tags: DEFAULT_TAGS.slice(), status: 'ready', startedAt: null, endedAt: null, offsetMs: 0, turns: [], observations: [], phaseEvents: [], syncEvents:[], history: [] };
+    return { schemaVersion: 1, sessionId: id(), revision: 0, topic: '빅데이터 알고리즘의 편향성 — 수학은 과연 거짓말을 하지 않을까?', students: ['A','B','C','D','E','F'].map((name, i) => ({ id: id(), name, side: i < 3 ? '찬성' : '반대' })), tags: DEFAULT_TAGS.slice(), leftSide:'찬성', status: 'ready', startedAt: null, endedAt: null, offsetMs: 0, turns: [], observations: [], phaseEvents: [], syncEvents:[], history: [] };
   }
   function elapsed(s, now = Date.now()) {
     return s.startedAt === null ? 0 : Math.max(0, (s.endedAt === null ? now : s.endedAt) - s.startedAt);
@@ -17,12 +17,15 @@
   function ordered(s) { return s.turns.map((t,i) => ({...t, order:i})).sort((a,b) => a.atMs - b.atMs || a.order - b.order); }
   function current(s) { const list = ordered(s); return list[list.length - 1] || null; }
   function phase(s) { return s.phaseEvents.length ? s.phaseEvents[s.phaseEvents.length - 1].phase : PHASES[0]; }
+  function seatSides(s) { const left=s.leftSide??'찬성';return [left,left==='찬성'?'반대':'찬성']; }
   function validate(s) {
     if (!s || s.schemaVersion !== 1 || !['ready','running','ended'].includes(s.status) || typeof s.topic !== 'string' || !s.topic.trim() || !Number.isInteger(s.revision) || s.revision < 0 || typeof s.sessionId !== 'string') throw new Error('지원하지 않거나 손상된 저장 자료입니다.');
     if (!Array.isArray(s.students) || !s.students.length || s.students.some(p => typeof p.id !== 'string' || typeof p.name !== 'string' || !p.name.trim() || !['찬성','반대'].includes(p.side))) throw new Error('학생 설정이 올바르지 않습니다.');
     if (new Set(s.students.map(p=>p.id)).size !== s.students.length || !Array.isArray(s.tags) || s.tags.some(t=>typeof t !== 'string' || !t.trim()) || !Number.isFinite(s.offsetMs)) throw new Error('설정 자료가 올바르지 않습니다.');
     if (s.status === 'ready' ? s.startedAt !== null || s.endedAt !== null : !Number.isFinite(s.startedAt) || (s.status === 'running' ? s.endedAt !== null : !Number.isFinite(s.endedAt) || s.endedAt < s.startedAt)) throw new Error('토론 시간 자료가 올바르지 않습니다.');
     if(s.syncEvents===undefined)s.syncEvents=[];
+    if(s.leftSide===undefined)s.leftSide='찬성';
+    if(!['찬성','반대'].includes(s.leftSide))throw new Error('좌석 배치 설정이 올바르지 않습니다.');
     if (!Array.isArray(s.turns) || !Array.isArray(s.observations) || !Array.isArray(s.phaseEvents) || !Array.isArray(s.history) || !Array.isArray(s.syncEvents)) throw new Error('기록 목록이 올바르지 않습니다.');
     const validTime = n => Number.isFinite(n) && n >= 0;
     if (s.turns.some(t=>typeof t.id !== 'string' || !validTime(t.atMs) || !PHASES.includes(t.phase) || !['student','moderator','unknown','silence'].includes(t.kind) || (t.kind === 'student' ? !s.students.some(p=>p.id===t.speakerId) : t.speakerId !== null))) throw new Error('발언 자료가 올바르지 않습니다.');
@@ -83,6 +86,7 @@
       case 'end':
         live(); next.status = 'ended'; next.endedAt = Math.max(s.startedAt, now); break;
       case 'offset': next.offsetMs = action.offsetMs; break;
+      case 'swapSeats':next.leftSide=seatSides(s)[1];break;
       case 'sync':
         live();next.syncEvents.push({id:id(),atMs:elapsed(s,now),label:action.label||'지금 박수! 화면 표시 (녹음에서 박수 확인 필요)'});break;
       case 'edit': {
@@ -149,5 +153,5 @@
     if(s.syncEvents.length){lines.push('','박수 기준 표시 (실제 박수는 화면 표시와 반응 시간 차이가 있을 수 있음):');s.syncEvents.forEach(e=>lines.push('앱 '+format(e.atMs,true)+' / 녹음 보정 '+format(e.atMs+s.offsetMs,true)+' '+e.label));}
     return lines.join('\n');
   }
-  return {PHASES,DEFAULT_TAGS,id,fresh,clone,validate,elapsed,ordered,current,phase,apply,format,parseTime,speaker,rows,csv,json,plain};
+  return {PHASES,DEFAULT_TAGS,id,fresh,clone,validate,elapsed,ordered,current,phase,seatSides,apply,format,parseTime,speaker,rows,csv,json,plain};
 }));
