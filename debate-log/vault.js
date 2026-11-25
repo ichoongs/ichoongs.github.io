@@ -30,6 +30,7 @@
       return transaction('readwrite',store=>store.put({sessionId:state.sessionId,state:data,draft:JSON.parse(JSON.stringify(draft)),savedAt:Date.now()}));
     },
     list: async()=>{const sessions=await transaction('readonly',store=>store.getAll());return sessions.sort((a,b)=>b.savedAt-a.savedAt);},
-    get: sessionId=>transaction('readonly',store=>store.get(sessionId))
+    get: sessionId=>transaction('readonly',store=>store.get(sessionId)),
+    remove: sessionId=>transaction('readwrite',store=>store.delete(sessionId))
   };
 }());

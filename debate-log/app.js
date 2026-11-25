@@ -7,6 +7,7 @@
   let state = D.fresh(), draft = {text:'',turnId:null}, lastSavedRaw = null, corrupt = false, conflict = false, dirty = false, savedAt = null, toastTimer, bootError = '';
   let setupStudents = [];
   let cancelCountdown=null;
+  let libraryBusy=false;
   try {
     lastSavedRaw = localStorage.getItem(KEY);
     if (lastSavedRaw !== null) {
@@ -46,7 +47,7 @@
   }
   function renderDisabled() {
     const locked=corrupt||conflict;
-    document.querySelectorAll('.student-button,.tag-button,#unknown-button,#silence-button,#add-memo,#end-button,#undo-button,#phases button').forEach(b=>b.disabled=locked||state.status!=='running');
+    document.querySelectorAll('.student-button,.tag-button,#moderator-button,#unknown-button,#silence-button,#add-memo,#end-button,#undo-button,#phases button').forEach(b=>b.disabled=locked||state.status!=='running');
     $('undo-button').disabled=locked||!state.history.length;
     $('setup-form').querySelectorAll('button,input,select,textarea').forEach(el=>el.disabled=locked);
     $('offset-form').querySelectorAll('button,input').forEach(el=>el.disabled=locked);
@@ -72,7 +73,7 @@
     $('clock').textContent=D.format(D.elapsed(state));
     $('recording-clock').textContent=state.offsetMs?'녹음 '+D.format(D.elapsed(state)+state.offsetMs):'녹음과 같은 시간축';
     const t=D.current(state);
-    if(t) $('current-time').textContent='시작 '+D.format(t.atMs)+' · '+(state.status==='ended'?'종료된 구간':(t.kind==='student'?'발언 중 ':'구간 경과 ')+D.format(D.elapsed(state)-t.atMs));
+    if(t) $('current-time').textContent='시작 '+D.format(t.atMs)+' · '+(state.status==='ended'?'종료된 구간':(['student','moderator'].includes(t.kind)?'발언 중 ':'구간 경과 ')+D.format(D.elapsed(state)-t.atMs));
   }
   function recordMarkup(t) {
     const p=state.students.find(p=>p.id===t.speakerId), obs=state.observations.filter(o=>o.turnId===t.id);
@@ -100,6 +101,7 @@
       const on=!!current&&state.observations.some(o=>o.turnId===current.id&&o.type==='tag'&&o.value===tag);
       return `<button class="tag-button ${on?'active':''}" data-tag="${escape(tag)}" aria-pressed="${on}">${escape(tag)}</button>`;
     }).join('');
+    $('moderator-button').classList.toggle('active',current?.kind==='moderator');$('moderator-button').setAttribute('aria-pressed',current?.kind==='moderator');
     $('unknown-button').classList.toggle('active',current?.kind==='unknown'); $('silence-button').classList.toggle('active',current?.kind==='silence');
     $('unknown-button').setAttribute('aria-pressed',current?.kind==='unknown'); $('silence-button').setAttribute('aria-pressed',current?.kind==='silence');
     const list=D.ordered(state).reverse();
@@ -157,13 +159,14 @@
   }
   async function openLibrary(){
     if($('tools-dialog').open)$('tools-dialog').close();
-    $('library-list').innerHTML='<p class="hint">보관함을 불러오는 중입니다.</p>';$('library-error').textContent='';$('library-dialog').showModal();
+    $('library-list').innerHTML='<p class="hint">보관함을 불러오는 중입니다.</p>';$('library-error').textContent='';if(!$('library-dialog').open)$('library-dialog').showModal();
     try {
       const sessions=await vault.list();
-      $('library-list').innerHTML=sessions.length?sessions.map(entry=>`<article class="library-row"><div><strong>${escape(entry.state.topic)}</strong><p class="hint">${new Date(entry.state.startedAt??entry.savedAt).toLocaleString('ko-KR')} · ${entry.state.students.length}명 · 발언 ${entry.state.turns.length}개 · ${entry.state.status==='ended'?'종료':'보관됨'}</p></div><button class="button small" data-open-session="${escape(entry.sessionId)}" ${entry.sessionId===state.sessionId?'disabled':''}>${entry.sessionId===state.sessionId?'현재 토론':'열기'}</button></article>`).join(''):'<div class="empty-state">아직 보관한 토론이 없어요. 종료하거나 새 토론을 준비하면 보관됩니다.</div>';
+      $('library-list').innerHTML=sessions.length?sessions.map(entry=>`<article class="library-row"><div><strong>${escape(entry.state.topic)}</strong><p class="hint">${new Date(entry.state.startedAt??entry.savedAt).toLocaleString('ko-KR')} · ${entry.state.students.length}명 · 발언 ${entry.state.turns.length}개 · ${entry.state.status==='ended'?'종료':'보관됨'}</p></div><div class="library-actions"><button class="button small" data-open-session="${escape(entry.sessionId)}" ${entry.sessionId===state.sessionId||corrupt||conflict?'disabled':''}>${entry.sessionId===state.sessionId?'현재 토론':'열기'}</button><button class="button small danger" data-delete-session="${escape(entry.sessionId)}" aria-label="${escape(entry.state.topic)} 삭제" ${corrupt||conflict||(entry.sessionId===state.sessionId&&state.status==='running')?'disabled':''}>삭제</button></div></article>`).join(''):'<div class="empty-state">아직 보관한 토론이 없어요. 종료하거나 새 토론을 준비하면 보관됩니다.</div>';
     }catch(error){$('library-list').innerHTML='';$('library-error').textContent='보관함을 열 수 없습니다. 현재 자료를 JSON으로 내보내 주세요. '+error.message;}
   }
   async function loadSession(sessionId){
+    if(libraryBusy)return;
     if(corrupt||conflict){toast('현재 저장 상태를 먼저 확인해 주세요.');return;}
     try{
       const entry=await vault.get(sessionId);if(!entry)throw new Error('보관한 토론을 찾을 수 없습니다.');D.validate(entry.state);
@@ -172,10 +175,35 @@
       save();renderSetup();renderSession();$('library-dialog').close();window.scrollTo(0,0);toast('보관한 토론을 열었습니다.');
     }catch(error){$('library-error').textContent='전환하지 못했습니다. '+error.message;}
   }
+  async function removeSession(sessionId){
+    if(libraryBusy)return;
+    libraryBusy=true;
+    try{
+      ensureWritable();
+      if(sessionId===state.sessionId&&state.status==='running')throw new Error('진행 중인 토론은 종료한 뒤 삭제해 주세요.');
+      const entry=await vault.get(sessionId);if(!entry)throw new Error('이미 삭제되었거나 보관한 토론을 찾을 수 없습니다.');
+      const isCurrent=sessionId===state.sessionId;
+      const message='“'+entry.state.topic+'”\n'+new Date(entry.state.startedAt??entry.savedAt).toLocaleString('ko-KR')+'\n\n이 토론의 발언·관찰 기록을 기기에서 삭제합니다. 삭제는 되돌릴 수 없으니 필요하면 JSON으로 먼저 내보내 주세요.'+(isCurrent?'\n현재 열린 종료 토론입니다. 학생·주제·태그 설정을 유지한 새 토론 준비 화면으로 돌아갑니다.':'');
+      if(!await confirmAction('지난 토론을 삭제할까요?',message,'토론 삭제'))return;
+      ensureWritable();
+      if(sessionId===state.sessionId){
+        if(state.status==='running')throw new Error('진행 중인 토론은 삭제할 수 없습니다.');
+        const previous=state,previousDraft=draft,next=D.fresh();
+        next.topic=state.topic;next.students=D.clone(state.students);next.tags=state.tags.slice();state=next;draft={text:'',turnId:null};
+        // Clear the active autosave first so a refresh cannot resurrect the deleted session.
+        // If writing fails, leave the archive intact and retain the in-memory records.
+        if(!save()){state=previous;draft=previousDraft;renderSession();throw new Error('현재 자료 저장 상태를 확인해 주세요. 보관함 기록은 삭제하지 않았습니다.');}
+        $('memo').value='';renderSetup();renderSession();
+      }
+      await vault.remove(sessionId);
+      await openLibrary();toast('지난 토론을 삭제했습니다.');
+    }catch(error){$('library-error').textContent='삭제하지 못했습니다. '+error.message;}
+    finally{libraryBusy=false;}
+  }
   function openEdit(turnId) {
     const t=state.turns.find(t=>t.id===turnId); if(!t) return;
     $('edit-id').value=t.id;
-    $('edit-speaker').innerHTML=state.students.map(p=>`<option value="${escape(p.id)}">${escape(p.name)} · ${p.side}</option>`).join('')+'<option value="unknown">화자 불명</option><option value="silence">발언 없음</option>';
+    $('edit-speaker').innerHTML=state.students.map(p=>`<option value="${escape(p.id)}">${escape(p.name)} · ${p.side}</option>`).join('')+'<option value="moderator">사회자</option><option value="unknown">화자 불명</option><option value="silence">발언 없음</option>';
     $('edit-speaker').value=t.kind==='student'?t.speakerId:t.kind;
     $('edit-time').value=D.format(t.atMs,true);
     $('edit-phase').innerHTML=D.PHASES.map(p=>`<option>${p}</option>`).join(''); $('edit-phase').value=t.phase;
@@ -224,6 +252,7 @@
     if(b.dataset.edit)openEdit(b.dataset.edit);
     if(b.dataset.export)exportFile(b.dataset.export);
     if(b.dataset.openSession)loadSession(b.dataset.openSession);
+    if(b.dataset.deleteSession)return removeSession(b.dataset.deleteSession);
     if(b.dataset.addSide) {if(setupStudents.length>=30){toast('학생은 최대 30명까지 배치할 수 있습니다.');return;}setupStudents.push({id:D.id(),name:'새 학생',side:b.dataset.addSide});configure(true);}
     if(b.dataset.roster) {
       const row=b.closest('[data-person]'), index=setupStudents.findIndex(p=>p.id===row.dataset.person),p=setupStudents[index];
@@ -233,6 +262,7 @@
     }
   });
   $('unknown-button').onclick=()=>commit({type:'speak',kind:'unknown'});
+  $('moderator-button').onclick=()=>commit({type:'speak',kind:'moderator'});
   $('silence-button').onclick=()=>commit({type:'speak',kind:'silence'});
   $('memo').value=draft.text;
   $('memo').oninput=()=>{
@@ -255,7 +285,7 @@
   $('edit-form').onsubmit=e=>{
     e.preventDefault();
     try {
-      const speaker=$('edit-speaker').value,kind=['unknown','silence'].includes(speaker)?speaker:'student';
+      const speaker=$('edit-speaker').value,kind=['moderator','unknown','silence'].includes(speaker)?speaker:'student';
       const action={type:'edit',turnId:$('edit-id').value,speakerId:kind==='student'?speaker:null,kind,atMs:D.parseTime($('edit-time').value),phase:$('edit-phase').value,tags:Array.from($('edit-tags').querySelectorAll('input:checked')).map(x=>x.value),memos:Array.from($('edit-memos').querySelectorAll('textarea')).map(x=>({id:x.dataset.memoId,value:x.value})),newMemo:$('edit-new-memo').value};
       ensureWritable();const next=D.apply(state,action);state=next;save();renderSession();if(state.status==='ended')vault.put(state,draft).catch(()=>toast('보관함 갱신에 실패했습니다. 현재 자료를 JSON으로 보관해 주세요.'));$('edit-dialog').close();toast('기록을 수정했습니다.');
     }catch(error){$('edit-error').textContent=error.message;}

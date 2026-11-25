@@ -25,7 +25,7 @@
     if(s.syncEvents===undefined)s.syncEvents=[];
     if (!Array.isArray(s.turns) || !Array.isArray(s.observations) || !Array.isArray(s.phaseEvents) || !Array.isArray(s.history) || !Array.isArray(s.syncEvents)) throw new Error('기록 목록이 올바르지 않습니다.');
     const validTime = n => Number.isFinite(n) && n >= 0;
-    if (s.turns.some(t=>typeof t.id !== 'string' || !validTime(t.atMs) || !PHASES.includes(t.phase) || !['student','unknown','silence'].includes(t.kind) || (t.kind === 'student' ? !s.students.some(p=>p.id===t.speakerId) : t.speakerId !== null))) throw new Error('발언 자료가 올바르지 않습니다.');
+    if (s.turns.some(t=>typeof t.id !== 'string' || !validTime(t.atMs) || !PHASES.includes(t.phase) || !['student','moderator','unknown','silence'].includes(t.kind) || (t.kind === 'student' ? !s.students.some(p=>p.id===t.speakerId) : t.speakerId !== null))) throw new Error('발언 자료가 올바르지 않습니다.');
     if (new Set(s.turns.map(t=>t.id)).size !== s.turns.length || s.observations.some(o=>typeof o.id !== 'string' || !s.turns.some(t=>t.id===o.turnId) || !validTime(o.atMs) || !['tag','memo'].includes(o.type) || typeof o.value !== 'string') || s.phaseEvents.some(p=>!validTime(p.atMs) || !PHASES.includes(p.phase))) throw new Error('관찰 자료가 올바르지 않습니다.');
     if(s.syncEvents.some(e=>typeof e.id!=='string'||!validTime(e.atMs)||typeof e.label!=='string'))throw new Error('시간 맞춤 신호 자료가 올바르지 않습니다.');
     if (s.status === 'ready' && (s.turns.length || s.observations.length || s.phaseEvents.length || s.syncEvents.length)) throw new Error('시작 전 기록이 올바르지 않습니다.');
@@ -115,7 +115,7 @@
     if (m>59 || s>=60) throw new Error('분과 초는 60 미만이어야 합니다.');
     return Math.round((h*3600+m*60+s)*1000);
   }
-  function speaker(s,t) { if (t.kind==='unknown') return '화자 불명'; if(t.kind==='silence') return '발언 없음'; return s.students.find(p=>p.id===t.speakerId)?.name || '미지정'; }
+  function speaker(s,t) { if(t.kind==='moderator')return '사회자'; if (t.kind==='unknown') return '화자 불명'; if(t.kind==='silence') return '발언 없음'; return s.students.find(p=>p.id===t.speakerId)?.name || '미지정'; }
   function rows(s, now=Date.now()) {
     const list = ordered(s), result = [];
     for (let i=0;i<list.length;i++) {

@@ -95,3 +95,14 @@ test('long sessions keep undo storage proportional to changes rather than full s
   assert.ok(JSON.stringify(s.history).length<20000);assert.ok(JSON.stringify(s).length<300000);
   s=D.apply(s,{type:'undo'});assert.equal(s.turns.length,999);assert.equal(D.current(s).speakerId,s.students[998%6].id);
 });
+test('moderator speech has its own continuous interval, observations, editing and exports',()=>{
+  let s=speak(started(),0,1000);s=D.apply(s,{type:'speak',kind:'moderator'},START+5000);
+  const moderator=D.current(s);assert.equal(moderator.speakerId,null);assert.equal(D.speaker(s,moderator),'사회자');
+  s=D.apply(s,{type:'tag',value:'핵심 질문'},START+7000);s=D.apply(s,{type:'memo',turnId:moderator.id,value:'질문을 정리함'},START+8000);
+  s=D.apply(s,{type:'speak',kind:'silence'},START+10000);s=speak(s,3,13000);
+  assert.equal(s.observations[0].turnId,moderator.id);assert.equal(moderator.atMs,5000);
+  const row=D.rows(s,START+16000).find(r=>r.type==='발언'&&r.speaker==='사회자');assert.equal(row.durationMs,5000);assert.equal(row.side,'');
+  assert.ok(D.csv(s).includes('사회자'));assert.ok(D.plain(s).includes('사회자'));D.validate({...JSON.parse(D.json(s)),history:[]});
+  const edit={type:'edit',turnId:s.turns[3].id,speakerId:null,kind:'moderator',atMs:13000,phase:'입론',tags:[],memos:[],newMemo:''};
+  s=D.apply(s,edit,START+16000);assert.equal(D.current(s).kind,'moderator');s=D.apply(s,{type:'undo'});assert.equal(D.current(s).kind,'student');
+});

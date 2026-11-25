@@ -6,7 +6,7 @@ const vm=require('node:vm');
 const D=require('../core.js');
 const source=fs.readFileSync(require.resolve('../app.js'),'utf8');
 const KEY='debate-log.v1';
-function harness(raw){
+function harness(raw,entries=[]){
   const elements=new Map(),listeners={},blobs=new Map(),downloads=[];
   class Element{
     constructor(){this.textContent='';this.innerHTML='';this.hidden=false;this.disabled=false;this.value='';this.open=false;this.dataset={};this.handlers={};this.classList={add(){},remove(){},toggle(){}};}
@@ -24,11 +24,13 @@ function harness(raw){
   const storage={fail:false,writes:0,getItem:key=>values.get(key)??null,setItem(key,value){this.writes++;if(this.fail)throw new Error('QuotaExceededError');values.set(key,value);}};
   const document={getElementById:element,querySelectorAll:()=>[],addEventListener:(name,fn)=>listeners[name]=fn,visibilityState:'visible',createElement:()=>new Element(),body:{appendChild(){}}};
   const archived=[];
-  const window={Debate:D,DebateVault:{put:async(s,d)=>{archived.push({state:D.clone(s),draft:D.clone(d)});},list:async()=>[]},addEventListener:(name,fn)=>listeners['window:'+name]=fn,scrollTo(){}};
+  const library=new Map(entries.map(e=>[e.sessionId,e]));
+  const vault={failRemove:false,put:async(s,d)=>{const entry={sessionId:s.sessionId,state:D.clone(s),draft:D.clone(d),savedAt:Date.now()};archived.push(entry);library.set(s.sessionId,entry);},list:async()=>Array.from(library.values()),get:async id=>library.get(id),remove:async id=>{if(vault.failRemove)throw new Error('IndexedDB failure');library.delete(id);}};
+  const window={Debate:D,DebateVault:vault,addEventListener:(name,fn)=>listeners['window:'+name]=fn,scrollTo(){}};
   const URL={createObjectURL:blob=>{const key='blob:'+blobs.size;blobs.set(key,blob);return key;},revokeObjectURL(){}};
   vm.runInNewContext(source,{window,document,localStorage:storage,Blob,URL,Date,setTimeout:()=>1,clearTimeout(){},setInterval(){},console});
-  function click(dataset){listeners.click({target:{closest:()=>({dataset,disabled:false})}});}
-  return {element,storage,values,listeners,click,downloads,archived,state:()=>JSON.parse(values.get(KEY)).state,draft:()=>JSON.parse(values.get(KEY)).draft};
+  function click(dataset){return listeners.click({target:{closest:()=>({dataset,disabled:false})}});}
+  return {element,storage,values,listeners,click,downloads,archived,library,vault,state:()=>JSON.parse(values.get(KEY)).state,draft:()=>JSON.parse(values.get(KEY)).draft};
 }
 function fixture(){const now=Date.now();let s=D.apply(D.fresh(),{type:'start',clap:true},now-60000);return D.apply(s,{type:'speak',speakerId:s.students[0].id},now-55000);}
 const wrapped=s=>JSON.stringify({state:s,draft:{text:'',turnId:null}});
@@ -87,4 +89,33 @@ test('JSON restore archives current session, recovers data and draft, and exclud
   const s=h.state();assert.equal(s.status,'ended');assert.equal(s.turns[0].id,imported.turns[0].id);assert.notEqual(s.sessionId,imported.sessionId);
   assert.equal(s.records,undefined);assert.equal(s.exportedAt,undefined);assert.equal(h.draft().turnId,imported.turns[0].id);
   assert.equal(h.archived[0].state.sessionId,original.sessionId);assert.equal(h.archived[0].state.status,'ended');
+});
+const entry=s=>({sessionId:s.sessionId,state:s,draft:{text:'',turnId:null},savedAt:Date.now()});
+async function confirmDelete(h,id,accept=true){const pending=h.click({deleteSession:id});await new Promise(setImmediate);h.element(accept?'confirm-ok':'confirm-cancel').onclick();await pending;}
+test('moderator button records immediately and restores the current speaker on refresh',()=>{
+  const h=harness(wrapped(fixture()));h.element('moderator-button').onclick();const s=h.state();
+  assert.equal(D.current(s).kind,'moderator');assert.equal(h.element('current-speaker').textContent,'사회자');
+  const restored=harness(h.values.get(KEY));assert.equal(restored.element('current-speaker').textContent,'사회자');
+});
+test('deleting a past session respects cancel and leaves the running session unchanged',async()=>{
+  const current=fixture(),old=D.apply(fixture(),{type:'end'}),h=harness(wrapped(current),[entry(old)]);
+  await confirmDelete(h,old.sessionId,false);assert.equal(h.library.size,1);assert.equal(h.state().sessionId,current.sessionId);
+  await confirmDelete(h,old.sessionId);assert.equal(h.library.size,0);assert.equal(h.state().sessionId,current.sessionId);assert.equal(h.state().status,'running');
+});
+test('deleting the currently open ended session clears autosave and cannot resurrect on refresh',async()=>{
+  const s=D.apply(fixture(),{type:'end'}),h=harness(wrapped(s),[entry(s)]);
+  await confirmDelete(h,s.sessionId);assert.equal(h.library.size,0);assert.equal(h.state().status,'ready');assert.equal(h.state().turns.length,0);assert.equal(h.state().history.length,0);assert.notEqual(h.state().sessionId,s.sessionId);
+  assert.deepEqual(h.state().students,s.students);const restored=harness(h.values.get(KEY));assert.equal(restored.element('record-count').textContent,0);
+});
+test('failed current-session reset or archive delete retains the archive and reports the error',async()=>{
+  for(const failure of ['storage','indexedDB']){
+    const s=D.apply(fixture(),{type:'end'}),current=failure==='storage'?s:fixture(),h=harness(wrapped(current),[entry(s)]);
+    if(failure==='storage')h.storage.fail=true;else h.vault.failRemove=true;
+    await confirmDelete(h,s.sessionId);assert.equal(h.library.size,1);assert.match(h.element('library-error').textContent,/삭제하지 못했습니다/);
+    assert.equal(h.state().sessionId,current.sessionId);assert.equal(h.state().turns.length,current.turns.length);
+  }
+});
+test('running current session cannot be deleted even when invoked directly',async()=>{
+  const s=fixture(),h=harness(wrapped(s),[entry(s)]);await h.click({deleteSession:s.sessionId});
+  assert.equal(h.library.size,1);assert.match(h.element('library-error').textContent,/진행 중/);assert.equal(h.state().status,'running');
 });
