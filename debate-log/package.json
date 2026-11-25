@@ -1,0 +1,10 @@
+{
+  "name": "debate-log",
+  "version": "1.0.0",
+  "private": true,
+  "description": "교사용 기기 내 저장 토론 기록실",
+  "scripts": {
+    "test": "node --test tests/core.test.cjs tests/persistence.test.cjs",
+    "check": "node --check core.js && node --check vault.js && node --check app.js"
+  }
+}
